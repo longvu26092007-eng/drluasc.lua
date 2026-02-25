@@ -228,15 +228,20 @@ local LeftPanel = Create("Frame",{Parent = Background,BackgroundColor3 = Color3.
 local LogList = Create("ScrollingFrame",{Parent = LeftPanel,Active = true,BackgroundColor3 = Color3.new(1, 1, 1),BackgroundTransparency = 1,BorderSizePixel = 0,Position = UDim2.new(0, 0, 0, 9),Size = UDim2.new(0, 165, 0, 384),CanvasSize = UDim2.new(0, 0, 0, 0),ScrollBarThickness = 4})
 local UIListLayout = Create("UIListLayout",{Parent = LogList,HorizontalAlignment = Enum.HorizontalAlignment.Center,SortOrder = Enum.SortOrder.LayoutOrder})
 local RightPanel = Create("Frame",{Parent = Background,BackgroundColor3 = Color3.fromRGB(37, 36, 38),BorderSizePixel = 0,Position = UDim2.new(0, 165, 0, 19),Size = UDim2.new(0, 485, 0, 401)})
-local CodeBox = Create("Frame",{Parent = RightPanel,BackgroundColor3 = Color3.new(0.06, 0.06, 0.07),BorderSizePixel = 0,Size = UDim2.new(1, 0, 0, 276)})
-local ScrollingFrame = Create("ScrollingFrame",{Parent = RightPanel,Active = true,BackgroundColor3 = Color3.new(1, 1, 1),BackgroundTransparency = 1,Position = UDim2.new(0, 0, 0, 310),Size = UDim2.new(1, 0, 0, 91),CanvasSize = UDim2.new(0, 0, 0, 0),ScrollBarThickness = 4})
--- [[ COPY STRIP: big prominent copy button between codebox and buttons ]]
-local CopyStrip = Create("Frame",{Parent = RightPanel,BackgroundColor3 = Color3.fromRGB(30, 30, 30),BorderSizePixel = 0,Position = UDim2.new(0, 0, 0, 278),Size = UDim2.new(1, 0, 0, 30)})
-local CopyBtn = Create("TextButton",{Parent = CopyStrip,BackgroundColor3 = Color3.fromRGB(52, 168, 83),BorderSizePixel = 0,Position = UDim2.new(0, 4, 0, 3),Size = UDim2.new(0, 120, 0, 24),Font = Enum.Font.GothamBold,Text = "⎘  COPY CODE",TextColor3 = Color3.new(1, 1, 1),TextSize = 13,AutoButtonColor = false})
-local CopyRemoteBtn = Create("TextButton",{Parent = CopyStrip,BackgroundColor3 = Color3.fromRGB(66, 133, 244),BorderSizePixel = 0,Position = UDim2.new(0, 130, 0, 3),Size = UDim2.new(0, 120, 0, 24),Font = Enum.Font.GothamBold,Text = "⎘  COPY PATH",TextColor3 = Color3.new(1, 1, 1),TextSize = 13,AutoButtonColor = false})
-local RunBtn = Create("TextButton",{Parent = CopyStrip,BackgroundColor3 = Color3.fromRGB(234, 67, 53),BorderSizePixel = 0,Position = UDim2.new(0, 256, 0, 3),Size = UDim2.new(0, 80, 0, 24),Font = Enum.Font.GothamBold,Text = "▶  RUN",TextColor3 = Color3.new(1, 1, 1),TextSize = 13,AutoButtonColor = false})
-local CopyFeedback = Create("TextLabel",{Parent = CopyStrip,BackgroundTransparency = 1,Position = UDim2.new(0, 342, 0, 6),Size = UDim2.new(0, 140, 0, 18),Font = Enum.Font.Gotham,Text = "",TextColor3 = Color3.fromRGB(120, 220, 120),TextSize = 12,TextXAlignment = Enum.TextXAlignment.Left})
-local UIGridLayout = Create("UIGridLayout",{Parent = ScrollingFrame,HorizontalAlignment = Enum.HorizontalAlignment.Left,SortOrder = Enum.SortOrder.LayoutOrder,CellPadding = UDim2.new(0, 2, 0, 2),CellSize = UDim2.new(0, 94, 0, 24)})
+local CodeBox = Create("Frame",{Parent = RightPanel,BackgroundColor3 = Color3.new(0.06, 0.06, 0.07),BorderSizePixel = 0,Position = UDim2.new(0,0,0,0),Size = UDim2.new(1, 0, 0, 272)})
+
+-- CopyStrip: nằm dưới CodeBox, chứa các nút chính + Pause
+local CopyStrip = Create("Frame",{Parent = RightPanel,BackgroundColor3 = Color3.fromRGB(28, 28, 30),BorderSizePixel = 0,Position = UDim2.new(0, 0, 0, 274),Size = UDim2.new(1, 0, 0, 32)})
+local CopyBtn = Create("TextButton",{Parent = CopyStrip,BackgroundColor3 = Color3.fromRGB(52, 168, 83),BorderSizePixel = 0,Position = UDim2.new(0, 4, 0, 4),Size = UDim2.new(0, 110, 0, 24),Font = Enum.Font.GothamBold,Text = "⎘  COPY CODE",TextColor3 = Color3.new(1,1,1),TextSize = 12,AutoButtonColor = false})
+local CopyRemoteBtn = Create("TextButton",{Parent = CopyStrip,BackgroundColor3 = Color3.fromRGB(66, 133, 244),BorderSizePixel = 0,Position = UDim2.new(0, 118, 0, 4),Size = UDim2.new(0, 105, 0, 24),Font = Enum.Font.GothamBold,Text = "⎘  COPY PATH",TextColor3 = Color3.new(1,1,1),TextSize = 12,AutoButtonColor = false})
+local RunBtn = Create("TextButton",{Parent = CopyStrip,BackgroundColor3 = Color3.fromRGB(220, 60, 45),BorderSizePixel = 0,Position = UDim2.new(0, 227, 0, 4),Size = UDim2.new(0, 70, 0, 24),Font = Enum.Font.GothamBold,Text = "▶  RUN",TextColor3 = Color3.new(1,1,1),TextSize = 12,AutoButtonColor = false})
+local PauseBtn = Create("TextButton",{Parent = CopyStrip,BackgroundColor3 = Color3.fromRGB(180, 130, 30),BorderSizePixel = 0,Position = UDim2.new(0, 301, 0, 4),Size = UDim2.new(0, 90, 0, 24),Font = Enum.Font.GothamBold,Text = "⏸  PAUSE",TextColor3 = Color3.new(1,1,1),TextSize = 12,AutoButtonColor = false})
+local CopyFeedback = Create("TextLabel",{Parent = CopyStrip,BackgroundTransparency = 1,Position = UDim2.new(0, 397, 0, 7),Size = UDim2.new(1, -401, 0, 18),Font = Enum.Font.Gotham,Text = "",TextColor3 = Color3.fromRGB(120,220,120),TextSize = 11,TextXAlignment = Enum.TextXAlignment.Left})
+
+-- ButtonsPanel: nằm dưới CopyStrip, dùng UIListLayout theo hàng ngang cuộn được
+local ScrollingFrame = Create("ScrollingFrame",{Parent = RightPanel,Active = true,BackgroundColor3 = Color3.fromRGB(33,33,36),BackgroundTransparency = 0,BorderSizePixel = 0,Position = UDim2.new(0, 0, 0, 308),Size = UDim2.new(1, 0, 0, 93),CanvasSize = UDim2.new(0, 0, 0, 0),ScrollBarThickness = 3,ScrollBarImageColor3 = Color3.fromRGB(80,80,90)})
+local UIGridLayout = Create("UIGridLayout",{Parent = ScrollingFrame,HorizontalAlignment = Enum.HorizontalAlignment.Left,SortOrder = Enum.SortOrder.LayoutOrder,CellPadding = UDim2.new(0, 3, 0, 3),CellSize = UDim2.new(0, 108, 0, 28)})
+local BtnPadding = Create("UIPadding",{Parent = ScrollingFrame,PaddingLeft = UDim.new(0,4),PaddingTop = UDim.new(0,4)})
 local TopBar = Create("Frame",{Parent = Background,BackgroundColor3 = Color3.fromRGB(37, 35, 38),BorderSizePixel = 0,Size = UDim2.new(0, 650, 0, 19)})
 local Simple = Create("TextButton",{Parent = TopBar,BackgroundColor3 = Color3.new(1, 1, 1),AutoButtonColor = false,BackgroundTransparency = 1,Position = UDim2.new(0, 5, 0, 0),Size = UDim2.new(0, 57, 0, 18),Font = Enum.Font.SourceSansBold,Text =  "SimpleSpy",TextColor3 = Color3.new(1, 1, 1),TextSize = 14,TextXAlignment = Enum.TextXAlignment.Left})
 local CloseButton = Create("TextButton",{Parent = TopBar,BackgroundColor3 = Color3.new(0.145098, 0.141176, 0.14902),BorderSizePixel = 0,Position = UDim2.new(1, -19, 0, 0),Size = UDim2.new(0, 19, 0, 19),Font = Enum.Font.SourceSans,Text = "",TextColor3 = Color3.new(0, 0, 0),TextSize = 14})
@@ -279,6 +284,7 @@ local getNil = false
 local connectedRemotes = {}
 --- True = hookfunction, false = namecall
 local toggle = false
+local paused = false  -- pause logging (set by PauseBtn)
 --- used to prevent recursives
 local prevTables = {}
 --- holds logs (for deletion)
@@ -749,31 +755,28 @@ end
 
 --- Adjusts the ui elements to the 'Maximized' size
 function maximizeSize(speed)
-    if not speed then
-        speed = 0.05
-    end
+    if not speed then speed = 0.05 end
     local totalH = Background.AbsoluteSize.Y - TopBar.AbsoluteSize.Y
-    local codeH = math.max(100, totalH - 125) -- codebox gets most space, 125 for strip+buttons
-    TweenService:Create(LeftPanel, TweenInfo.new(speed), { Size = UDim2.fromOffset(LeftPanel.AbsoluteSize.X, totalH) }):Play()
-    TweenService:Create(RightPanel, TweenInfo.new(speed), { Size = UDim2.fromOffset(Background.AbsoluteSize.X - LeftPanel.AbsoluteSize.X, totalH) }):Play()
-    TweenService:Create(TopBar, TweenInfo.new(speed), { Size = UDim2.fromOffset(Background.AbsoluteSize.X, TopBar.AbsoluteSize.Y) }):Play()
-    TweenService:Create(CodeBox, TweenInfo.new(speed), { Size = UDim2.fromOffset(Background.AbsoluteSize.X - LeftPanel.AbsoluteSize.X, codeH) }):Play()
-    TweenService:Create(CopyStrip, TweenInfo.new(speed), { Position = UDim2.fromOffset(0, codeH), Size = UDim2.fromOffset(Background.AbsoluteSize.X - LeftPanel.AbsoluteSize.X, 30) }):Play()
-    TweenService:Create(ScrollingFrame, TweenInfo.new(speed), { Size = UDim2.fromOffset(Background.AbsoluteSize.X - LeftPanel.AbsoluteSize.X, totalH - codeH - 32), Position = UDim2.fromOffset(0, codeH + 32) }):Play()
-    TweenService:Create(LogList, TweenInfo.new(speed), { Size = UDim2.fromOffset(LogList.AbsoluteSize.X, totalH - 18) }):Play()
+    local codeH = math.max(80, totalH - 93 - 32 - 2) -- 93 buttons, 32 copystrip, 2 gap
+    TweenService:Create(LeftPanel, TweenInfo.new(speed), {Size = UDim2.fromOffset(LeftPanel.AbsoluteSize.X, totalH)}):Play()
+    TweenService:Create(RightPanel, TweenInfo.new(speed), {Size = UDim2.fromOffset(Background.AbsoluteSize.X - LeftPanel.AbsoluteSize.X, totalH)}):Play()
+    TweenService:Create(TopBar, TweenInfo.new(speed), {Size = UDim2.fromOffset(Background.AbsoluteSize.X, TopBar.AbsoluteSize.Y)}):Play()
+    TweenService:Create(CodeBox, TweenInfo.new(speed), {Size = UDim2.fromOffset(Background.AbsoluteSize.X - LeftPanel.AbsoluteSize.X, codeH)}):Play()
+    TweenService:Create(CopyStrip, TweenInfo.new(speed), {Position = UDim2.fromOffset(0, codeH + 2), Size = UDim2.fromOffset(Background.AbsoluteSize.X - LeftPanel.AbsoluteSize.X, 32)}):Play()
+    TweenService:Create(ScrollingFrame, TweenInfo.new(speed), {Position = UDim2.fromOffset(0, codeH + 36), Size = UDim2.fromOffset(Background.AbsoluteSize.X - LeftPanel.AbsoluteSize.X, totalH - codeH - 36)}):Play()
+    TweenService:Create(LogList, TweenInfo.new(speed), {Size = UDim2.fromOffset(LogList.AbsoluteSize.X, totalH)}):Play()
 end
 
 --- Adjusts the ui elements to close the side
 function minimizeSize(speed)
-    if not speed then
-        speed = 0.05
-    end
-    TweenService:Create(LeftPanel, TweenInfo.new(speed), { Size = UDim2.fromOffset(LeftPanel.AbsoluteSize.X, Background.AbsoluteSize.Y - TopBar.AbsoluteSize.Y) }):Play()
-    TweenService:Create(RightPanel, TweenInfo.new(speed), { Size = UDim2.fromOffset(0, Background.AbsoluteSize.Y - TopBar.AbsoluteSize.Y) }):Play()
-    TweenService:Create(TopBar, TweenInfo.new(speed), { Size = UDim2.fromOffset(LeftPanel.AbsoluteSize.X, TopBar.AbsoluteSize.Y) }):Play()
-    TweenService:Create(ScrollingFrame, TweenInfo.new(speed), { Size = UDim2.fromOffset(0, 91), Position = UDim2.fromOffset(0, Background.AbsoluteSize.Y - 91 - TopBar.AbsoluteSize.Y) }):Play()
-    TweenService:Create(CodeBox, TweenInfo.new(speed), { Size = UDim2.fromOffset(0, Background.AbsoluteSize.Y - 91 - TopBar.AbsoluteSize.Y) }):Play()
-    TweenService:Create(LogList, TweenInfo.new(speed), { Size = UDim2.fromOffset(LogList.AbsoluteSize.X, Background.AbsoluteSize.Y - TopBar.AbsoluteSize.Y - 18) }):Play()
+    if not speed then speed = 0.05 end
+    TweenService:Create(LeftPanel, TweenInfo.new(speed), {Size = UDim2.fromOffset(LeftPanel.AbsoluteSize.X, Background.AbsoluteSize.Y - TopBar.AbsoluteSize.Y)}):Play()
+    TweenService:Create(RightPanel, TweenInfo.new(speed), {Size = UDim2.fromOffset(0, Background.AbsoluteSize.Y - TopBar.AbsoluteSize.Y)}):Play()
+    TweenService:Create(TopBar, TweenInfo.new(speed), {Size = UDim2.fromOffset(LeftPanel.AbsoluteSize.X, TopBar.AbsoluteSize.Y)}):Play()
+    TweenService:Create(CodeBox, TweenInfo.new(speed), {Size = UDim2.fromOffset(0, 272)}):Play()
+    TweenService:Create(CopyStrip, TweenInfo.new(speed), {Size = UDim2.fromOffset(0, 32)}):Play()
+    TweenService:Create(ScrollingFrame, TweenInfo.new(speed), {Size = UDim2.fromOffset(0, 93), Position = UDim2.fromOffset(0, 308)}):Play()
+    TweenService:Create(LogList, TweenInfo.new(speed), {Size = UDim2.fromOffset(LogList.AbsoluteSize.X, Background.AbsoluteSize.Y - TopBar.AbsoluteSize.Y)}):Play()
 end
 
 --- Ensures size is within screensize limitations
@@ -856,7 +859,7 @@ function eventSelect(frame)
     if selected and selected.Log  then
         if selected.Button then
             spawn(function()
-                TweenService:Create(selected.Button, TweenInfo.new(0.5), {BackgroundColor3 = Color3.fromRGB(0, 0, 0)}):Play()
+                TweenService:Create(selected.Button.Parent, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60,59,63)}):Play()
             end)
         end
         selected = nil
@@ -868,7 +871,7 @@ function eventSelect(frame)
     end
     if selected and selected.Log then
         spawn(function()
-            TweenService:Create(frame.Button, TweenInfo.new(0.5), {BackgroundColor3 = Color3.fromRGB(92, 126, 229)}):Play()
+            TweenService:Create(frame.Button.Parent, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(75, 90, 170)}):Play()
         end)
         codebox:setRaw(selected.GenScript)
     end
@@ -948,15 +951,17 @@ end
 ---@param description function
 ---@param onClick function
 function newButton(name, description, onClick)
-    local FunctionTemplate = Create("Frame",{Name = "FunctionTemplate",Parent = ScrollingFrame,BackgroundColor3 = Color3.new(1, 1, 1),BackgroundTransparency = 1,Size = UDim2.new(0, 110, 0, 22)})
-    local ColorBar = Create("Frame",{Name = "ColorBar",Parent = FunctionTemplate,BackgroundColor3 = Color3.new(1, 1, 1),BorderSizePixel = 0,Position = UDim2.new(0, 4, 0, 8),Size = UDim2.new(0, 5, 0, 14),ZIndex = 3})
-    local Text = Create("TextLabel",{Text = name,Name = "Text",Parent = FunctionTemplate,BackgroundColor3 = Color3.new(1, 1, 1),BackgroundTransparency = 1,Position = UDim2.new(0, 14, 0, 8),Size = UDim2.new(0, 80, 0, 14),ZIndex = 2,Font = Enum.Font.Gotham,TextColor3 = Color3.new(1, 1, 1),TextSize = 11,TextStrokeColor3 = Color3.new(0.145098, 0.141176, 0.14902),TextXAlignment = Enum.TextXAlignment.Left})
-    local Button = Create("TextButton",{Name = "Button",Parent = FunctionTemplate,BackgroundColor3 = Color3.new(0, 0, 0),BackgroundTransparency = 0.6,BorderColor3 = Color3.new(1, 1, 1),Position = UDim2.new(0, 4, 0, 8),Size = UDim2.new(0, 94, 0, 14),AutoButtonColor = false,Font = Enum.Font.SourceSans,Text = "",TextColor3 = Color3.new(0, 0, 0),TextSize = 14})
+    local FunctionTemplate = Create("Frame",{Name = "FunctionTemplate",Parent = ScrollingFrame,BackgroundColor3 = Color3.fromRGB(45,45,50),BackgroundTransparency = 0,BorderSizePixel = 0,Size = UDim2.new(0, 108, 0, 28)})
+    local BtnCorner = Create("UICorner",{Parent = FunctionTemplate,CornerRadius = UDim.new(0,4)})
+    local Text = Create("TextLabel",{Text = name,Name = "Text",Parent = FunctionTemplate,BackgroundTransparency = 1,Position = UDim2.new(0, 8, 0, 0),Size = UDim2.new(1, -8, 1, 0),ZIndex = 2,Font = Enum.Font.Gotham,TextColor3 = Color3.fromRGB(210,210,215),TextSize = 11,TextXAlignment = Enum.TextXAlignment.Left,TextTruncate = Enum.TextTruncate.AtEnd})
+    local Button = Create("TextButton",{Name = "Button",Parent = FunctionTemplate,BackgroundTransparency = 1,BorderSizePixel = 0,Position = UDim2.new(0,0,0,0),Size = UDim2.new(1,0,1,0),AutoButtonColor = false,Font = Enum.Font.SourceSans,Text = "",TextColor3 = Color3.new(0,0,0),TextSize = 14,ZIndex = 3})
 
     Button.MouseEnter:Connect(function()
+        TweenService:Create(FunctionTemplate, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(65,65,75)}):Play()
         makeToolTip(true, description())
     end)
     Button.MouseLeave:Connect(function()
+        TweenService:Create(FunctionTemplate, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(45,45,50)}):Play()
         makeToolTip(false)
     end)
     FunctionTemplate.AncestryChanged:Connect(function()
@@ -964,6 +969,10 @@ function newButton(name, description, onClick)
     end)
     Button.MouseButton1Click:Connect(function(...)
         logthread(running())
+        TweenService:Create(FunctionTemplate, TweenInfo.new(0.07), {BackgroundColor3 = Color3.fromRGB(80,80,95)}):Play()
+        task.delay(0.1, function()
+            TweenService:Create(FunctionTemplate, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(45,45,50)}):Play()
+        end)
         onClick(FunctionTemplate, ...)
     end)
     updateFunctionCanvas()
@@ -977,14 +986,15 @@ end
 --- @param function_info string
 --- @param blocked any
 function newRemote(type, data)
+    if paused then return end  -- PAUSE: không log khi đang pause
     if layoutOrderNum < 1 then layoutOrderNum = 999999999 end
     local remote = data.remote
     local callingscript = data.callingscript
 
-    local RemoteTemplate = Create("Frame",{LayoutOrder = layoutOrderNum,Name = "RemoteTemplate",Parent = LogList,BackgroundColor3 = Color3.new(1, 1, 1),BackgroundTransparency = 1,Size = UDim2.new(0, 165, 0, 27)})
-    local ColorBar = Create("Frame",{Name = "ColorBar",Parent = RemoteTemplate,BackgroundColor3 = (type == "event" and Color3.fromRGB(255, 200, 0)) or Color3.fromRGB(99, 86, 245),BorderSizePixel = 0,Position = UDim2.new(0, 0, 0, 1),Size = UDim2.new(0, 5, 0, 18),ZIndex = 2})
-    local Text = Create("TextLabel",{TextTruncate = Enum.TextTruncate.AtEnd,Name = "Text",Parent = RemoteTemplate,BackgroundColor3 = Color3.new(1, 1, 1),BackgroundTransparency = 1,Position = UDim2.new(0, 10, 0, 1),Size = UDim2.new(0, 152, 0, 18),ZIndex = 2,Font = Enum.Font.Code,Text = remote.Name,TextColor3 = Color3.new(1, 1, 1),TextSize = 12,TextXAlignment = Enum.TextXAlignment.Left})
-    local Button = Create("TextButton",{Name = "Button",Parent = RemoteTemplate,BackgroundColor3 = Color3.new(0, 0, 0),BackgroundTransparency = 0.75,BorderColor3 = Color3.new(1, 1, 1),Position = UDim2.new(0, 0, 0, 1),Size = UDim2.new(0, 165, 0, 18),AutoButtonColor = false,Font = Enum.Font.SourceSans,Text = "",TextColor3 = Color3.new(0, 0, 0),TextSize = 14})
+    local RemoteTemplate = Create("Frame",{LayoutOrder = layoutOrderNum,Name = "RemoteTemplate",Parent = LogList,BackgroundColor3 = Color3.fromRGB(60,59,63),BackgroundTransparency = 0,BorderSizePixel = 0,Size = UDim2.new(0, 165, 0, 26)})
+    local ColorBar = Create("Frame",{Name = "ColorBar",Parent = RemoteTemplate,BackgroundColor3 = (type == "event" and Color3.fromRGB(255, 200, 0)) or Color3.fromRGB(99, 86, 245),BorderSizePixel = 0,Position = UDim2.new(0, 0, 0, 0),Size = UDim2.new(0, 4, 1, 0),ZIndex = 2})
+    local Text = Create("TextLabel",{TextTruncate = Enum.TextTruncate.AtEnd,Name = "Text",Parent = RemoteTemplate,BackgroundTransparency = 1,Position = UDim2.new(0, 8, 0, 0),Size = UDim2.new(0, 154, 1, 0),ZIndex = 2,Font = Enum.Font.Code,Text = remote.Name,TextColor3 = Color3.fromRGB(220,220,225),TextSize = 11,TextXAlignment = Enum.TextXAlignment.Left})
+    local Button = Create("TextButton",{Name = "Button",Parent = RemoteTemplate,BackgroundTransparency = 1,BorderSizePixel = 0,Position = UDim2.new(0, 0, 0, 0),Size = UDim2.new(1, 0, 1, 0),AutoButtonColor = false,Font = Enum.Font.SourceSans,Text = "",TextColor3 = Color3.new(0, 0, 0),TextSize = 14,ZIndex = 3})
 
     local log = {
         Name = remote.name,
@@ -1002,6 +1012,16 @@ function newRemote(type, data)
     }
 
     logs[#logs + 1] = log
+    Button.MouseEnter:Connect(function()
+        if not (selected and selected.Log == RemoteTemplate) then
+            TweenService:Create(RemoteTemplate, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(75,74,80)}):Play()
+        end
+    end)
+    Button.MouseLeave:Connect(function()
+        if not (selected and selected.Log == RemoteTemplate) then
+            TweenService:Create(RemoteTemplate, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(60,59,63)}):Play()
+        end
+    end)
     local connect = Button.MouseButton1Click:Connect(function()
         logthread(running())
         eventSelect(RemoteTemplate)
@@ -1985,70 +2005,87 @@ function SimpleSpy:newButton(name, description, onClick)
     return newButton(name, description, onClick)
 end
 
--- [[ COPY STRIP WIRING — big buttons ]]
+-- ============================================================
+-- PAUSE SYSTEM
+-- ============================================================
+-- paused is declared near top of file alongside toggle
+
+local function setPaused(state)
+    paused = state
+    if paused then
+        PauseBtn.Text = "▶  RESUME"
+        PauseBtn.BackgroundColor3 = Color3.fromRGB(52, 168, 83)
+    else
+        PauseBtn.Text = "⏸  PAUSE"
+        PauseBtn.BackgroundColor3 = Color3.fromRGB(180, 130, 30)
+    end
+end
+
+PauseBtn.MouseButton1Click:Connect(function()
+    setPaused(not paused)
+end)
+PauseBtn.MouseEnter:Connect(function()
+    TweenService:Create(PauseBtn, TweenInfo.new(0.12), {BackgroundColor3 = paused and Color3.fromRGB(72,200,100) or Color3.fromRGB(210,155,40)}):Play()
+end)
+PauseBtn.MouseLeave:Connect(function()
+    TweenService:Create(PauseBtn, TweenInfo.new(0.12), {BackgroundColor3 = paused and Color3.fromRGB(52,168,83) or Color3.fromRGB(180,130,30)}):Play()
+end)
+
+-- ============================================================
+-- COPY STRIP WIRING
+-- ============================================================
 do
     local function flashFeedback(msg, clr)
         CopyFeedback.Text = msg
-        CopyFeedback.TextColor3 = clr or Color3.fromRGB(120, 220, 120)
-        task.delay(1.5, function() CopyFeedback.Text = "" end)
+        CopyFeedback.TextColor3 = clr or Color3.fromRGB(120,220,120)
+        task.delay(1.8, function() if CopyFeedback.Text == msg then CopyFeedback.Text = "" end end)
     end
 
+    -- COPY CODE
     CopyBtn.MouseButton1Click:Connect(function()
         if codebox then
             setclipboard(codebox:getString())
-            flashFeedback("✓ Copied!", Color3.fromRGB(100, 220, 100))
-            TweenService:Create(CopyBtn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(30, 120, 50)}):Play()
-            task.delay(0.2, function()
-                TweenService:Create(CopyBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(52, 168, 83)}):Play()
-            end)
+            flashFeedback("✓ Copied!", Color3.fromRGB(100,220,100))
+            TweenService:Create(CopyBtn, TweenInfo.new(0.08), {BackgroundColor3 = Color3.fromRGB(30,110,50)}):Play()
+            task.delay(0.15, function() TweenService:Create(CopyBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(52,168,83)}):Play() end)
         end
     end)
-    CopyBtn.MouseEnter:Connect(function()
-        TweenService:Create(CopyBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(72, 200, 100)}):Play()
-    end)
-    CopyBtn.MouseLeave:Connect(function()
-        TweenService:Create(CopyBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(52, 168, 83)}):Play()
-    end)
+    CopyBtn.MouseEnter:Connect(function() TweenService:Create(CopyBtn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(70,195,100)}):Play() end)
+    CopyBtn.MouseLeave:Connect(function() TweenService:Create(CopyBtn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(52,168,83)}):Play() end)
 
+    -- COPY PATH
     CopyRemoteBtn.MouseButton1Click:Connect(function()
         if selected and selected.Remote then
             setclipboard(v2s(selected.Remote))
-            flashFeedback("✓ Path copied!", Color3.fromRGB(100, 180, 255))
+            flashFeedback("✓ Path copied!", Color3.fromRGB(100,180,255))
         else
-            flashFeedback("✗ No remote selected", Color3.fromRGB(255, 120, 80))
+            flashFeedback("✗ No remote selected", Color3.fromRGB(255,120,80))
         end
     end)
-    CopyRemoteBtn.MouseEnter:Connect(function()
-        TweenService:Create(CopyRemoteBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(90, 160, 255)}):Play()
-    end)
-    CopyRemoteBtn.MouseLeave:Connect(function()
-        TweenService:Create(CopyRemoteBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(66, 133, 244)}):Play()
-    end)
+    CopyRemoteBtn.MouseEnter:Connect(function() TweenService:Create(CopyRemoteBtn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(90,155,255)}):Play() end)
+    CopyRemoteBtn.MouseLeave:Connect(function() TweenService:Create(CopyRemoteBtn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(66,133,244)}):Play() end)
 
+    -- RUN
     RunBtn.MouseButton1Click:Connect(function()
         local Remote = selected and selected.Remote
         if Remote then
-            flashFeedback("Running...", Color3.fromRGB(255, 200, 80))
+            flashFeedback("Running...", Color3.fromRGB(255,200,80))
             xpcall(function()
                 if Remote:IsA("RemoteEvent") then
                     Remote:FireServer(unpack(selected.args))
                 else
                     Remote:InvokeServer(unpack(selected.args))
                 end
-                flashFeedback("✓ Executed!", Color3.fromRGB(100, 220, 100))
+                flashFeedback("✓ Executed!", Color3.fromRGB(100,220,100))
             end, function(err)
-                flashFeedback("✗ Error", Color3.fromRGB(255, 80, 80))
+                flashFeedback("✗ Error: " .. tostring(err):sub(1,30), Color3.fromRGB(255,80,80))
             end)
         else
-            flashFeedback("✗ No remote selected", Color3.fromRGB(255, 120, 80))
+            flashFeedback("✗ No remote selected", Color3.fromRGB(255,120,80))
         end
     end)
-    RunBtn.MouseEnter:Connect(function()
-        TweenService:Create(RunBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(255, 90, 70)}):Play()
-    end)
-    RunBtn.MouseLeave:Connect(function()
-        TweenService:Create(RunBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(234, 67, 53)}):Play()
-    end)
+    RunBtn.MouseEnter:Connect(function() TweenService:Create(RunBtn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(240,80,65)}):Play() end)
+    RunBtn.MouseLeave:Connect(function() TweenService:Create(RunBtn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(220,60,45)}):Play() end)
 end
 
 ----- ADD ONS ----- (easily add or remove additonal functionality to the RemoteSpy!)
