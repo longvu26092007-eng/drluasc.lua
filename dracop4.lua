@@ -94,10 +94,21 @@ end
 -- [ PHẦN 1.5 ] CHECK BACKPACK & STATS
 -- ==========================================
 local function CheckHasWeapon(weaponName)
-    local bp  = Player:FindFirstChild("Backpack")
+    -- Check character đang equip
     local chr = Player.Character
     if chr and chr:FindFirstChild(weaponName) then return true end
-    if bp  and bp:FindFirstChild(weaponName)  then return true end
+    -- Check backpack local
+    local bp = Player:FindFirstChild("Backpack")
+    if bp and bp:FindFirstChild(weaponName) then return true end
+    -- Check inventory server (cất trong kho)
+    local ok, inv = pcall(function()
+        return game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("getInventory")
+    end)
+    if ok and type(inv) == "table" then
+        for _, v in pairs(inv) do
+            if type(v) == "table" and v.Name == weaponName then return true end
+        end
+    end
     return false
 end
 local function getStats()
