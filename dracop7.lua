@@ -285,6 +285,77 @@ task.wait(1)
 ActionStatus.Text = "Hành động: UI sẵn sàng, bắt đầu kiểm tra..."
 
 -- ==========================================
+-- [ 3.05 ] KIỂM TRA FRAGMENT
+-- Nếu dưới 12000 → chạy farm Katakuri, block cho đến khi đủ
+-- Nếu đủ rồi → tiếp tục xuống 3.1
+-- ==========================================
+
+local FRAGMENT_MIN = 12000
+
+local function GetFragments()
+    local val = 0
+    pcall(function() val = Player.Data.Fragments.Value end)
+    return val
+end
+
+local function RunFarmFragment()
+    repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
+    getgenv().Key    = "1f34f32b6f1917a66d57e8c6"
+    getgenv().NewUI  = true
+    getgenv().Config = {
+        ["Select Method Farm"] = "Farm Katakuri",
+        ["Hop Find Katakuri"]  = true,
+        ["Start Farm"]         = true,
+    }
+    local ok, err = pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/obiiyeuem/vthangsitink/main/BananaHub.lua"))()
+    end)
+    if ok then
+        warn("[DracoAuto] [3.05] BananaHub FarmFragment load thành công!")
+    else
+        warn("[DracoAuto] [3.05] BananaHub FarmFragment load thất bại: " .. tostring(err))
+    end
+end
+
+do
+    local frag = GetFragments()
+
+    if frag < FRAGMENT_MIN then
+        -- Chưa đủ → load farm, đợi cho đến khi Fragment >= 12000
+        ActionStatus.Text = "Hành động: [3.05] Fragment thiếu (" .. frag .. "/" .. FRAGMENT_MIN .. "), bắt đầu farm Katakuri..."
+        warn("[DracoAuto] [3.05] Fragment = " .. frag .. " < " .. FRAGMENT_MIN .. " → Chạy FarmFragment!")
+
+        RunFarmFragment()
+
+        -- Vòng chờ: cập nhật UI mỗi 3 giây cho đến khi đủ fragment
+        repeat
+            task.wait(3)
+            frag = GetFragments()
+            ActionStatus.Text = string.format(
+                "Hành động: [3.05] Đang farm Fragment (%d/%d)...",
+                frag, FRAGMENT_MIN
+            )
+            -- FragLabel cũng được update bởi vòng Phần 2, nhưng cập nhật luôn cho chắc
+            FragLabel.Text      = "🔮 Fragments: " .. tostring(frag)
+            FragLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        until frag >= FRAGMENT_MIN
+
+        -- Đủ rồi
+        FragLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+        ActionStatus.Text    = "Hành động: [3.05] ✅ Đủ Fragment (" .. frag .. ")! Tiếp tục kịch bản..."
+        warn("[DracoAuto] [3.05] Fragment đủ rồi → tiếp tục 3.1!")
+        task.wait(1)
+
+    else
+        -- Đã đủ ngay từ đầu
+        ActionStatus.Text    = "Hành động: [3.05] Fragment đủ (" .. frag .. "), bỏ qua farm!"
+        FragLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+        warn("[DracoAuto] [3.05] Fragment = " .. frag .. " >= " .. FRAGMENT_MIN .. " → Bỏ qua farm, vào 3.1!")
+        task.wait(0.5)
+    end
+end
+
+-- ==========================================
 -- [ 3.1 ] AUTO EQUIP DRAGONHEART & DRAGONSTORM
 -- Phát hiện có trong inventory → equip cả hai
 -- Pattern tham khảo từ EquipWeapon trong DracoHub (CommF_ LoadItem)
