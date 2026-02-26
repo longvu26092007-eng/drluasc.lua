@@ -288,7 +288,7 @@ ActionStatus.Text = "Hành động: UI sẵn sàng, bắt đầu kiểm tra..."
 -- [ 3.05 ] KIỂM TRA FRAGMENT
 -- ==========================================
 
-local FRAGMENT_MIN = 12000
+local FRAGMENT_MIN = 8000
 
 local function GetFragments()
     local val = 0
