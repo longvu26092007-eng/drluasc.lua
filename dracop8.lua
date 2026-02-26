@@ -355,15 +355,13 @@ do
     end
 end
 
+
 -- ==========================================
--- [ 3.1 ] AUTO EQUIP DRAGONHEART & DRAGONSTORM
--- Phát hiện có trong inventory → equip cả hai
--- Pattern tham khảo từ EquipWeapon trong DracoHub (CommF_ LoadItem)
+-- [ 3.1 ] HELPERS DÙNG CHUNG
 -- ==========================================
 
 -- Equip vũ khí qua remote LoadItem
 local function EquipWeapon(weaponName)
-    -- Đang equip rồi thì bỏ qua, tránh gọi remote thừa
     local chr = Player.Character
     if chr and chr:FindFirstChild(weaponName) then
         warn("[DracoAuto] EquipWeapon: " .. weaponName .. " đã equip rồi, bỏ qua.")
@@ -380,7 +378,7 @@ local function EquipWeapon(weaponName)
     return ok
 end
 
--- Lấy inventory server, có fallback cache nếu mạng lỗi thoáng qua
+-- Lấy inventory server, có fallback cache
 local _lastInvCache = nil
 local _invFailCount = 0
 
@@ -395,96 +393,202 @@ local function GetInventory()
     end
     _invFailCount = _invFailCount + 1
     if _lastInvCache ~= nil then
-        return _lastInvCache, false  -- dùng cache, báo hiệu không fresh
+        return _lastInvCache, false
     end
     return {}, false
 end
 
 -- Kiểm tra item (3 lớp: đang equip → backpack local → kho server)
+-- Trả về: hasItem (bool), count (number)
 local function HasItem(invData, itemName)
     local chr = Player.Character
-    if chr and chr:FindFirstChild(itemName) then return true end
+    if chr and chr:FindFirstChild(itemName) then return true, 1 end
     local bp = Player:FindFirstChild("Backpack")
-    if bp and bp:FindFirstChild(itemName) then return true end
+    if bp and bp:FindFirstChild(itemName) then return true, 1 end
     for _, v in pairs(invData) do
-        if type(v) == "table" and v.Name == itemName then return true end
+        if type(v) == "table" and v.Name == itemName then
+            return true, (v.Count or 1)
+        end
     end
-    return false
+    return false, 0
 end
 
--- Vòng lặp chính kiểm tra mỗi 5 giây, dừng khi equip xong cả hai
-task.spawn(function()
-    local heartDone = false
-    local stormDone = false
+-- ==========================================
+-- [ 3.1 ] LUỒNG CHÍNH
+-- Kiểm tra Heart & Storm trước
+-- → Luồng 1: có cả hai → equip → qua 3.2
+-- → Luồng 2: chưa có → farm Scale → farm Ember → kick
+-- ==========================================
 
-    while true do
-        local inv, invFresh = GetInventory()
+do
+    local inv, _ = GetInventory()
+    local hasHeart, _ = HasItem(inv, "Dragonheart")
+    local hasStorm, _ = HasItem(inv, "Dragonstorm")
 
-        if not invFresh and _invFailCount >= 3 then
-            ActionStatus.Text = "Hành động: [3.1] ⚠ Inventory lỗi " .. _invFailCount .. " lần, dùng cache..."
+    -- Cập nhật UI
+    WeaponRowLabel.Text = string.format(
+        "Heart: %s  |  Storm: %s",
+        hasHeart and "✅" or "❌",
+        hasStorm and "✅" or "❌"
+    )
+
+    -- ==========================================
+    -- LUỒNG 1: Đã có cả Heart + Storm → equip rồi qua 3.2
+    -- ==========================================
+    if hasHeart and hasStorm then
+        warn("[DracoAuto] [3.1] Luồng 1: Phát hiện Heart + Storm trong inventory!")
+        ActionStatus.Text = "Hành động: [3.1] Phát hiện Heart + Storm → Đang equip..."
+
+        -- Equip Heart
+        ActionStatus.Text = "Hành động: [3.1] Đang equip Dragonheart..."
+        EquipWeapon("Dragonheart")
+        task.wait(0.8)
+
+        -- Equip Storm
+        ActionStatus.Text = "Hành động: [3.1] Đang equip Dragonstorm..."
+        EquipWeapon("Dragonstorm")
+        task.wait(0.8)
+
+        ActionStatus.Text = "Hành động: [3.1] ✅ Đã equip xong! Chuyển sang 3.2..."
+        warn("[DracoAuto] [3.1] Luồng 1 hoàn tất → tiếp tục 3.2!")
+        task.wait(1)
+
+    -- ==========================================
+    -- LUỒNG 2: Chưa có Heart/Storm → farm Scale → farm Ember
+    -- ==========================================
+    else
+        warn("[DracoAuto] [3.1] Luồng 2: Chưa có Heart/Storm → bắt đầu farm nguyên liệu!")
+        ActionStatus.Text = "Hành động: [3.1] Chưa có Heart & Storm → bắt đầu farm nguyên liệu..."
+        task.wait(1)
+
+        -- ----------------------------------------
+        -- BƯỚC A: FARM DRAGON SCALE (cần 5/5)
+        -- ----------------------------------------
+        local SCALE_MIN = 5
+        local EMBER_MIN = 55
+
+        do
+            local invA, _ = GetInventory()
+            local _, scaleCount = HasItem(invA, "Dragon Scale")
+
+            if scaleCount >= SCALE_MIN then
+                -- Đã đủ Scale ngay từ đầu → bỏ qua farm
+                ActionStatus.Text = "Hành động: [3.1-A] Dragon Scale đủ (" .. scaleCount .. "/5), bỏ qua farm!"
+                warn("[DracoAuto] [3.1-A] Scale = " .. scaleCount .. " >= 5 → skip farm Scale!")
+                task.wait(0.5)
+            else
+                -- Chưa đủ → load BananaHub DragonScale
+                ActionStatus.Text = "Hành động: [3.1-A] Dragon Scale thiếu (" .. scaleCount .. "/5) → Bắt đầu farm..."
+                warn("[DracoAuto] [3.1-A] Scale = " .. scaleCount .. " < 5 → Load BananaHub DragonScale!")
+
+                -- Script farm Dragon Scale (để riêng như yêu cầu)
+                repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
+                getgenv().Key    = "1f34f32b6f1917a66d57e8c6"
+                getgenv().NewUI  = true
+                getgenv().Config = {
+                    ["Select Material"] = "Dragon Scale",
+                    ["Farm Material"]   = true,
+                    ["Start Farm"]      = true,
+                }
+                local okA, errA = pcall(function()
+                    loadstring(game:HttpGet("https://raw.githubusercontent.com/obiiyeuem/vthangsitink/main/BananaHub.lua"))()
+                end)
+                if okA then
+                    warn("[DracoAuto] [3.1-A] BananaHub DragonScale load thành công!")
+                else
+                    warn("[DracoAuto] [3.1-A] BananaHub DragonScale load thất bại: " .. tostring(errA))
+                end
+
+                -- Vòng check liên tục mỗi 3s, kick ngay khi đủ 5/5
+                local lastScaleCount = scaleCount
+                repeat
+                    task.wait(3)
+                    local invLoop, _ = GetInventory()
+                    local _, nowScale = HasItem(invLoop, "Dragon Scale")
+                    ActionStatus.Text = string.format(
+                        "Hành động: [3.1-A] Đang farm Dragon Scale (%d/5)...", nowScale
+                    )
+                    warn("[DracoAuto] [3.1-A] Scale hiện tại: " .. nowScale)
+
+                    -- Kick ngay khi vừa đủ 5 (chuyển từ dưới 5 lên)
+                    if lastScaleCount < SCALE_MIN and nowScale >= SCALE_MIN then
+                        ActionStatus.Text = "Hành động: [3.1-A] ✅ Đủ 5/5 Dragon Scale! Đang Kick để nhận diện..."
+                        warn("[DracoAuto] [3.1-A] Scale đủ 5/5 → Kick!")
+                        task.wait(2)
+                        Player:Kick("\n[ Draco Auto ]\nĐủ 5/5 Dragon Scale!\nRejoin để tiến hành farm Blaze Ember.")
+                    end
+
+                    lastScaleCount = nowScale
+                until nowScale >= SCALE_MIN
+            end
         end
 
-        local hasHeart = HasItem(inv, "Dragonheart")
-        local hasStorm = HasItem(inv, "Dragonstorm")
+        -- ----------------------------------------
+        -- BƯỚC B: FARM BLAZE EMBER (cần 55/55)
+        -- Chỉ chạy đến đây nếu chưa bị kick ở bước A
+        -- (tức là có sẵn >= 5 Scale từ đầu)
+        -- ----------------------------------------
+        do
+            local invB, _ = GetInventory()
+            local _, emberCount = HasItem(invB, "Blaze Ember")
 
-        -- Cập nhật WeaponRowLabel ngay sau mỗi lần kiểm tra
-        WeaponRowLabel.Text = string.format(
-            "Heart: %s  |  Storm: %s",
-            hasHeart and "✅" or "❌",
-            hasStorm and "✅" or "❌"
-        )
-
-        if hasHeart and hasStorm then
-            -- Có cả hai → equip Heart trước, Storm sau
-            if not heartDone then
-                ActionStatus.Text = "Hành động: [3.1] Phát hiện Dragonheart → Đang equip..."
-                if EquipWeapon("Dragonheart") then
-                    heartDone = true
-                    task.wait(0.8)
-                end
-            end
-
-            if not stormDone then
-                ActionStatus.Text = "Hành động: [3.1] Phát hiện Dragonstorm → Đang equip..."
-                if EquipWeapon("Dragonstorm") then
-                    stormDone = true
-                    task.wait(0.8)
-                end
-            end
-
-            if heartDone and stormDone then
-                ActionStatus.Text = "Hành động: [3.1] ✅ Đã equip Dragonheart & Dragonstorm!"
-                warn("[DracoAuto] [3.1] Hoàn tất equip Heart + Storm.")
-                break
-            end
-
-        elseif hasHeart and not hasStorm then
-            -- Chỉ có Heart → equip rồi chờ Storm
-            if not heartDone then
-                ActionStatus.Text = "Hành động: [3.1] Có Dragonheart → equip, chờ Dragonstorm..."
-                if EquipWeapon("Dragonheart") then
-                    heartDone = true
-                end
+            if emberCount >= EMBER_MIN then
+                -- Đã đủ Ember ngay từ đầu → bỏ qua farm
+                ActionStatus.Text = "Hành động: [3.1-B] Blaze Ember đủ (" .. emberCount .. "/55), bỏ qua farm!"
+                warn("[DracoAuto] [3.1-B] Ember = " .. emberCount .. " >= 55 → skip farm Ember!")
+                task.wait(0.5)
             else
-                ActionStatus.Text = "Hành động: [3.1] Heart ✅ | Chờ Dragonstorm xuất hiện..."
-            end
+                -- Chưa đủ → load BananaHub BlazeEmber
+                ActionStatus.Text = "Hành động: [3.1-B] Blaze Ember thiếu (" .. emberCount .. "/55) → Bắt đầu farm..."
+                warn("[DracoAuto] [3.1-B] Ember = " .. emberCount .. " < 55 → Load BananaHub BlazeEmber!")
 
-        elseif not hasHeart and hasStorm then
-            -- Chỉ có Storm → equip rồi chờ Heart
-            if not stormDone then
-                ActionStatus.Text = "Hành động: [3.1] Có Dragonstorm → equip, chờ Dragonheart..."
-                if EquipWeapon("Dragonstorm") then
-                    stormDone = true
+                -- Script farm Blaze Ember (để riêng như yêu cầu)
+                repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
+                getgenv().Key    = "1f34f32b6f1917a66d57e8c6"
+                getgenv().NewUI  = true
+                getgenv().Config = {
+                    ["Auto Quest Dragon Hunter"] = true,
+                }
+                local okB, errB = pcall(function()
+                    loadstring(game:HttpGet("https://raw.githubusercontent.com/obiiyeuem/vthangsitink/main/BananaHub.lua"))()
+                end)
+                if okB then
+                    warn("[DracoAuto] [3.1-B] BananaHub BlazeEmber load thành công!")
+                else
+                    warn("[DracoAuto] [3.1-B] BananaHub BlazeEmber load thất bại: " .. tostring(errB))
                 end
-            else
-                ActionStatus.Text = "Hành động: [3.1] Storm ✅ | Chờ Dragonheart xuất hiện..."
-            end
 
-        else
-            -- Chưa có cái nào → chờ
-            ActionStatus.Text = "Hành động: [3.1] Chưa có Heart & Storm, đang chờ..."
+                -- Vòng check liên tục mỗi 3s, kick ngay khi đủ 55/55
+                local lastEmberCount = emberCount
+                repeat
+                    task.wait(3)
+                    local invLoop, _ = GetInventory()
+                    local _, nowEmber = HasItem(invLoop, "Blaze Ember")
+                    ActionStatus.Text = string.format(
+                        "Hành động: [3.1-B] Đang farm Blaze Ember (%d/55)...", nowEmber
+                    )
+                    warn("[DracoAuto] [3.1-B] Ember hiện tại: " .. nowEmber)
+
+                    -- Kick ngay khi vừa đủ 55
+                    if lastEmberCount < EMBER_MIN and nowEmber >= EMBER_MIN then
+                        ActionStatus.Text = "Hành động: [3.1-B] ✅ Đủ 55/55 Blaze Ember! Đang Kick để nhận diện..."
+                        warn("[DracoAuto] [3.1-B] Ember đủ 55/55 → Kick!")
+                        task.wait(2)
+                        Player:Kick("\n[ Draco Auto ]\nĐủ 55/55 Blaze Ember!\nRejoin để tiến hành Craft Heart & Storm.")
+                    end
+
+                    lastEmberCount = nowEmber
+                until nowEmber >= EMBER_MIN
+            end
         end
 
-        task.wait(5)
+        -- Đủ cả Scale + Ember (không bị kick) → tiếp tục 3.2
+        ActionStatus.Text = "Hành động: [3.1] ✅ Đủ nguyên liệu! Chuyển sang 3.2 (Craft)..."
+        warn("[DracoAuto] [3.1] Luồng 2 hoàn tất → tiếp tục 3.2!")
+        task.wait(1)
     end
-end)
+end
+
+-- ==========================================
+-- [ 3.2 ] (SẼ LÀM SAU)
+-- ==========================================
