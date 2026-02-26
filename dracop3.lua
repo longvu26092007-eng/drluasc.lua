@@ -91,8 +91,15 @@ local function TweenTo(targetCFrame)
 end
 
 -- ==========================================
--- [ PHẦN 1.5 ] CHECK STATS (từ MyStats)
+-- [ PHẦN 1.5 ] CHECK BACKPACK & STATS
 -- ==========================================
+local function CheckHasWeapon(weaponName)
+    local bp  = Player:FindFirstChild("Backpack")
+    local chr = Player.Character
+    if chr and chr:FindFirstChild(weaponName) then return true end
+    if bp  and bp:FindFirstChild(weaponName)  then return true end
+    return false
+end
 local function getStats()
     local s = { Race = "?", Fragments = 0, Points = 0,
                 Melee = 0, Defense = 0, Sword = 0, Gun = 0, Fruit = 0 }
@@ -122,7 +129,7 @@ local ScreenGui = Instance.new("ScreenGui", CoreGui)
 ScreenGui.Name = "DracoAutoUI"
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size             = UDim2.new(0, 450, 0, 240)
+MainFrame.Size             = UDim2.new(0, 450, 0, 265)
 MainFrame.Position         = UDim2.new(0.5, -225, 0.5, -107)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 MainFrame.Active           = true
@@ -223,6 +230,17 @@ StatRowLabel.BackgroundTransparency = 1
 StatRowLabel.TextSize           = 11
 StatRowLabel.TextXAlignment     = Enum.TextXAlignment.Left
 
+-- Weapon backpack check
+local WeaponRowLabel = Instance.new("TextLabel", InfoPanel)
+WeaponRowLabel.Size               = UDim2.new(1, 0, 0, 22)
+WeaponRowLabel.Position           = UDim2.new(0, 0, 0, 154)
+WeaponRowLabel.Text               = "Heart: ❌  |  Storm: ❌"
+WeaponRowLabel.TextColor3         = Color3.fromRGB(220, 220, 220)
+WeaponRowLabel.Font               = Enum.Font.Gotham
+WeaponRowLabel.BackgroundTransparency = 1
+WeaponRowLabel.TextSize           = 11
+WeaponRowLabel.TextXAlignment     = Enum.TextXAlignment.Left
+
 -- Auto update stats mỗi 3 giây
 task.spawn(function()
     while ScreenGui.Parent do
@@ -233,6 +251,13 @@ task.spawn(function()
         StatRowLabel.Text = string.format(
             "Melee:%d | Def:%d | Sword:%d | Gun:%d | Fruit:%d",
             s.Melee, s.Defense, s.Sword, s.Gun, s.Fruit
+        )
+        local hasHeart = CheckHasWeapon("Dragonheart")
+        local hasStorm = CheckHasWeapon("Dragonstorm")
+        WeaponRowLabel.Text = string.format(
+            "Heart: %s  |  Storm: %s",
+            hasHeart and "✅" or "❌",
+            hasStorm and "✅" or "❌"
         )
         task.wait(3)
     end
