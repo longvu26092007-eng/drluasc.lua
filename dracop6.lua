@@ -94,13 +94,10 @@ end
 -- [ PHẦN 1.5 ] CHECK BACKPACK & STATS
 -- ==========================================
 local function CheckHasWeapon(weaponName)
-    -- Check character đang equip
     local chr = Player.Character
     if chr and chr:FindFirstChild(weaponName) then return true end
-    -- Check backpack local
     local bp = Player:FindFirstChild("Backpack")
     if bp and bp:FindFirstChild(weaponName) then return true end
-    -- Check inventory server (cất trong kho)
     local ok, inv = pcall(function()
         return game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("getInventory")
     end)
@@ -111,6 +108,7 @@ local function CheckHasWeapon(weaponName)
     end
     return false
 end
+
 local function getStats()
     local s = { Race = "?", Fragments = 0, Points = 0,
                 Melee = 0, Defense = 0, Sword = 0, Gun = 0, Fruit = 0 }
@@ -271,5 +269,151 @@ task.spawn(function()
             hasStorm and "✅" or "❌"
         )
         task.wait(3)
+    end
+end)
+
+-- ==========================================
+-- [ PHẦN 3 : AUTOMATIC ]
+-- Chờ UI load xong rồi mới bắt đầu logic
+-- ==========================================
+
+-- 3.0 — Chờ UI hiện ra hoàn toàn trước khi làm gì
+repeat task.wait(0.5) until ScreenGui and ScreenGui.Parent ~= nil
+repeat task.wait(0.5) until MainFrame and MainFrame.Visible
+task.wait(1)
+
+ActionStatus.Text = "Hành động: UI sẵn sàng, bắt đầu kiểm tra..."
+
+-- ==========================================
+-- [ 3.1 ] AUTO EQUIP DRAGONHEART & DRAGONSTORM
+-- Phát hiện có trong inventory → equip cả hai
+-- Pattern tham khảo từ EquipWeapon trong DracoHub (CommF_ LoadItem)
+-- ==========================================
+
+-- Equip vũ khí qua remote LoadItem
+local function EquipWeapon(weaponName)
+    -- Đang equip rồi thì bỏ qua, tránh gọi remote thừa
+    local chr = Player.Character
+    if chr and chr:FindFirstChild(weaponName) then
+        warn("[DracoAuto] EquipWeapon: " .. weaponName .. " đã equip rồi, bỏ qua.")
+        return true
+    end
+    local ok, err = pcall(function()
+        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("LoadItem", weaponName)
+    end)
+    if ok then
+        warn("[DracoAuto] EquipWeapon: Đã equip " .. weaponName)
+    else
+        warn("[DracoAuto] EquipWeapon: Lỗi equip " .. weaponName .. " → " .. tostring(err))
+    end
+    return ok
+end
+
+-- Lấy inventory server, có fallback cache nếu mạng lỗi thoáng qua
+local _lastInvCache = nil
+local _invFailCount = 0
+
+local function GetInventory()
+    local ok, inv = pcall(function()
+        return game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("getInventory")
+    end)
+    if ok and type(inv) == "table" and next(inv) ~= nil then
+        _lastInvCache = inv
+        _invFailCount = 0
+        return inv, true
+    end
+    _invFailCount = _invFailCount + 1
+    if _lastInvCache ~= nil then
+        return _lastInvCache, false  -- dùng cache, báo hiệu không fresh
+    end
+    return {}, false
+end
+
+-- Kiểm tra item (3 lớp: đang equip → backpack local → kho server)
+local function HasItem(invData, itemName)
+    local chr = Player.Character
+    if chr and chr:FindFirstChild(itemName) then return true end
+    local bp = Player:FindFirstChild("Backpack")
+    if bp and bp:FindFirstChild(itemName) then return true end
+    for _, v in pairs(invData) do
+        if type(v) == "table" and v.Name == itemName then return true end
+    end
+    return false
+end
+
+-- Vòng lặp chính kiểm tra mỗi 5 giây, dừng khi equip xong cả hai
+task.spawn(function()
+    local heartDone = false
+    local stormDone = false
+
+    while true do
+        local inv, invFresh = GetInventory()
+
+        if not invFresh and _invFailCount >= 3 then
+            ActionStatus.Text = "Hành động: [3.1] ⚠ Inventory lỗi " .. _invFailCount .. " lần, dùng cache..."
+        end
+
+        local hasHeart = HasItem(inv, "Dragonheart")
+        local hasStorm = HasItem(inv, "Dragonstorm")
+
+        -- Cập nhật WeaponRowLabel ngay sau mỗi lần kiểm tra
+        WeaponRowLabel.Text = string.format(
+            "Heart: %s  |  Storm: %s",
+            hasHeart and "✅" or "❌",
+            hasStorm and "✅" or "❌"
+        )
+
+        if hasHeart and hasStorm then
+            -- Có cả hai → equip Heart trước, Storm sau
+            if not heartDone then
+                ActionStatus.Text = "Hành động: [3.1] Phát hiện Dragonheart → Đang equip..."
+                if EquipWeapon("Dragonheart") then
+                    heartDone = true
+                    task.wait(0.8)
+                end
+            end
+
+            if not stormDone then
+                ActionStatus.Text = "Hành động: [3.1] Phát hiện Dragonstorm → Đang equip..."
+                if EquipWeapon("Dragonstorm") then
+                    stormDone = true
+                    task.wait(0.8)
+                end
+            end
+
+            if heartDone and stormDone then
+                ActionStatus.Text = "Hành động: [3.1] ✅ Đã equip Dragonheart & Dragonstorm!"
+                warn("[DracoAuto] [3.1] Hoàn tất equip Heart + Storm.")
+                break
+            end
+
+        elseif hasHeart and not hasStorm then
+            -- Chỉ có Heart → equip rồi chờ Storm
+            if not heartDone then
+                ActionStatus.Text = "Hành động: [3.1] Có Dragonheart → equip, chờ Dragonstorm..."
+                if EquipWeapon("Dragonheart") then
+                    heartDone = true
+                end
+            else
+                ActionStatus.Text = "Hành động: [3.1] Heart ✅ | Chờ Dragonstorm xuất hiện..."
+            end
+
+        elseif not hasHeart and hasStorm then
+            -- Chỉ có Storm → equip rồi chờ Heart
+            if not stormDone then
+                ActionStatus.Text = "Hành động: [3.1] Có Dragonstorm → equip, chờ Dragonheart..."
+                if EquipWeapon("Dragonstorm") then
+                    stormDone = true
+                end
+            else
+                ActionStatus.Text = "Hành động: [3.1] Storm ✅ | Chờ Dragonheart xuất hiện..."
+            end
+
+        else
+            -- Chưa có cái nào → chờ
+            ActionStatus.Text = "Hành động: [3.1] Chưa có Heart & Storm, đang chờ..."
+        end
+
+        task.wait(5)
     end
 end)
