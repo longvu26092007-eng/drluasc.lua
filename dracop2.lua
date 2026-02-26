@@ -91,9 +91,29 @@ local function TweenTo(targetCFrame)
 end
 
 -- ==========================================
+-- [ PHẦN 1.5 ] CHECK STATS (từ MyStats)
+-- ==========================================
+local function getStats()
+    local s = { Race = "?", Fragments = 0, Points = 0,
+                Melee = 0, Defense = 0, Sword = 0, Gun = 0, Fruit = 0 }
+    pcall(function()
+        local D     = Player.Data
+        s.Race      = D.Race.Value
+        s.Fragments = D.Fragments.Value
+        s.Points    = D.Points.Value
+        local S     = D.Stats
+        s.Melee   = S.Melee.Level.Value
+        s.Defense = S.Defense.Level.Value
+        s.Sword   = S.Sword.Level.Value
+        s.Gun     = S.Gun.Level.Value
+        s.Fruit   = S["Demon Fruit"].Level.Value
+    end)
+    return s
+end
+
+-- ==========================================
 -- [ PHẦN 2 ] GIAO DIỆN UI (VÀNG - ĐEN)
 -- ==========================================
-
 if CoreGui:FindFirstChild("DracoAutoUI") then
     CoreGui.DracoAutoUI:Destroy()
 end
@@ -102,8 +122,8 @@ local ScreenGui = Instance.new("ScreenGui", CoreGui)
 ScreenGui.Name = "DracoAutoUI"
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size             = UDim2.new(0, 450, 0, 160)
-MainFrame.Position         = UDim2.new(0.5, -225, 0.5, -80)
+MainFrame.Size             = UDim2.new(0, 450, 0, 240)
+MainFrame.Position         = UDim2.new(0.5, -225, 0.5, -107)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 MainFrame.Active           = true
 MainFrame.Draggable        = true
@@ -130,8 +150,9 @@ InfoPanel.Size               = UDim2.new(1, -20, 1, -50)
 InfoPanel.Position           = UDim2.new(0, 10, 0, 40)
 InfoPanel.BackgroundTransparency = 1
 
+-- Hành động
 local ActionStatus = Instance.new("TextLabel", InfoPanel)
-ActionStatus.Size               = UDim2.new(1, 0, 0, 25)
+ActionStatus.Size               = UDim2.new(1, 0, 0, 22)
 ActionStatus.Position           = UDim2.new(0, 0, 0, 0)
 ActionStatus.Text               = "Hành động: Khởi động kịch bản..."
 ActionStatus.TextColor3         = Color3.fromRGB(200, 200, 200)
@@ -140,8 +161,9 @@ ActionStatus.BackgroundTransparency = 1
 ActionStatus.TextSize           = 12
 ActionStatus.TextXAlignment     = Enum.TextXAlignment.Left
 
+-- Mastery
 local MasteryLabel = Instance.new("TextLabel", InfoPanel)
-MasteryLabel.Size               = UDim2.new(1, 0, 0, 25)
+MasteryLabel.Size               = UDim2.new(1, 0, 0, 22)
 MasteryLabel.Position           = UDim2.new(0, 0, 0, 25)
 MasteryLabel.Text               = "Mastery: Chờ xác nhận vũ khí..."
 MasteryLabel.TextColor3         = Color3.fromRGB(255, 200, 0)
@@ -149,3 +171,69 @@ MasteryLabel.Font               = Enum.Font.GothamBold
 MasteryLabel.BackgroundTransparency = 1
 MasteryLabel.TextSize           = 13
 MasteryLabel.TextXAlignment     = Enum.TextXAlignment.Left
+
+-- Divider
+local Div = Instance.new("Frame", InfoPanel)
+Div.Size             = UDim2.new(1, 0, 0, 1)
+Div.Position         = UDim2.new(0, 0, 0, 52)
+Div.BackgroundColor3 = Color3.fromRGB(80, 60, 0)
+Div.BorderSizePixel  = 0
+
+-- Race
+local RaceLabel = Instance.new("TextLabel", InfoPanel)
+RaceLabel.Size               = UDim2.new(1, 0, 0, 22)
+RaceLabel.Position           = UDim2.new(0, 0, 0, 58)
+RaceLabel.Text               = "🧬 Race: ..."
+RaceLabel.TextColor3         = Color3.fromRGB(160, 200, 255)
+RaceLabel.Font               = Enum.Font.Gotham
+RaceLabel.BackgroundTransparency = 1
+RaceLabel.TextSize           = 12
+RaceLabel.TextXAlignment     = Enum.TextXAlignment.Left
+
+-- Fragments
+local FragLabel = Instance.new("TextLabel", InfoPanel)
+FragLabel.Size               = UDim2.new(1, 0, 0, 22)
+FragLabel.Position           = UDim2.new(0, 0, 0, 82)
+FragLabel.Text               = "🔮 Fragments: ..."
+FragLabel.TextColor3         = Color3.fromRGB(200, 160, 255)
+FragLabel.Font               = Enum.Font.Gotham
+FragLabel.BackgroundTransparency = 1
+FragLabel.TextSize           = 12
+FragLabel.TextXAlignment     = Enum.TextXAlignment.Left
+
+-- Điểm stat chưa dùng
+local PointsLabel = Instance.new("TextLabel", InfoPanel)
+PointsLabel.Size               = UDim2.new(1, 0, 0, 22)
+PointsLabel.Position           = UDim2.new(0, 0, 0, 106)
+PointsLabel.Text               = "⭐ Điểm stat chưa dùng: ..."
+PointsLabel.TextColor3         = Color3.fromRGB(255, 220, 80)
+PointsLabel.Font               = Enum.Font.GothamSemibold
+PointsLabel.BackgroundTransparency = 1
+PointsLabel.TextSize           = 12
+PointsLabel.TextXAlignment     = Enum.TextXAlignment.Left
+
+-- Stat hàng ngang
+local StatRowLabel = Instance.new("TextLabel", InfoPanel)
+StatRowLabel.Size               = UDim2.new(1, 0, 0, 22)
+StatRowLabel.Position           = UDim2.new(0, 0, 0, 130)
+StatRowLabel.Text               = "Melee:0 | Def:0 | Sword:0 | Gun:0 | Fruit:0"
+StatRowLabel.TextColor3         = Color3.fromRGB(220, 220, 220)
+StatRowLabel.Font               = Enum.Font.Gotham
+StatRowLabel.BackgroundTransparency = 1
+StatRowLabel.TextSize           = 11
+StatRowLabel.TextXAlignment     = Enum.TextXAlignment.Left
+
+-- Auto update stats mỗi 3 giây
+task.spawn(function()
+    while ScreenGui.Parent do
+        local s = getStats()
+        RaceLabel.Text    = "🧬 Race: " .. s.Race
+        FragLabel.Text    = "🔮 Fragments: " .. tostring(s.Fragments)
+        PointsLabel.Text  = "⭐ Điểm stat chưa dùng: " .. tostring(s.Points)
+        StatRowLabel.Text = string.format(
+            "Melee:%d | Def:%d | Sword:%d | Gun:%d | Fruit:%d",
+            s.Melee, s.Defense, s.Sword, s.Gun, s.Fruit
+        )
+        task.wait(3)
+    end
+end)
