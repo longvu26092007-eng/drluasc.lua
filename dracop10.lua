@@ -590,5 +590,148 @@ do
 end
 
 -- ==========================================
--- [ 3.2 ] (SẼ LÀM SAU)
+-- [ 3.2 ] AUTO CRAFT DRAGONHEART & DRAGONSTORM
+-- Tham khảo từ autobuy2items.lua
+-- Check lại inv: nếu đã có cả hai → bỏ qua craft
+-- Nếu chưa có → bay đến Craft NPC → craft Heart → craft Storm → kick
+-- ==========================================
+
+do
+    -- Kiểm tra lại lần cuối trước khi craft
+    local invC, _ = GetInventory()
+    local hasHeartNow, _ = HasItem(invC, "Dragonheart")
+    local hasStormNow, _ = HasItem(invC, "Dragonstorm")
+
+    -- Cập nhật UI
+    WeaponRowLabel.Text = string.format(
+        "Heart: %s  |  Storm: %s",
+        hasHeartNow and "✅" or "❌",
+        hasStormNow and "✅" or "❌"
+    )
+
+    if hasHeartNow and hasStormNow then
+        -- Đã có cả hai rồi → không cần craft
+        ActionStatus.Text = "Hành động: [3.2] Đã có Heart + Storm, bỏ qua craft!"
+        warn("[DracoAuto] [3.2] Đã có cả Heart + Storm → skip craft!")
+        task.wait(1)
+
+    else
+        -- Chưa có → tiến hành craft
+        warn("[DracoAuto] [3.2] Chưa đủ Heart/Storm → bắt đầu craft!")
+        ActionStatus.Text = "Hành động: [3.2] Bắt đầu craft Dragonheart & Dragonstorm..."
+        task.wait(0.5)
+
+        -- RF/Craft remote
+        local RFCraft
+        local rfOk = pcall(function()
+            RFCraft = game:GetService("ReplicatedStorage")
+                :WaitForChild("Modules")
+                :WaitForChild("Net")
+                :WaitForChild("RF/Craft")
+        end)
+
+        if not rfOk or not RFCraft then
+            ActionStatus.Text = "Hành động: [3.2] ❌ Không tìm được RF/Craft!"
+            warn("[DracoAuto] [3.2] RF/Craft không tìm thấy!")
+        else
+
+            -- requestEntrance cần gọi trước khi craft
+            local function RequestEntrance()
+                local entrancePos = Vector3.new(5661.5322265625, 1013.0907592773438, -334.9649963378906)
+                local ok, result = pcall(function()
+                    return game:GetService("ReplicatedStorage").Remotes.CommF_
+                        :InvokeServer("requestEntrance", entrancePos)
+                end)
+                if ok then
+                    warn("[DracoAuto] [3.2] requestEntrance OK:", result)
+                else
+                    warn("[DracoAuto] [3.2] requestEntrance FAILED:", result)
+                end
+            end
+
+            -- Craft 1 item qua RF/Craft
+            local function CraftItem(itemName)
+                local ok, res = pcall(function()
+                    return RFCraft:InvokeServer(unpack({
+                        [1] = "Craft",
+                        [2] = itemName,
+                        [3] = {}
+                    }))
+                end)
+                if ok then
+                    warn("[DracoAuto] [3.2] Craft " .. itemName .. " OK:", res)
+                else
+                    warn("[DracoAuto] [3.2] Craft " .. itemName .. " FAILED:", res)
+                end
+                return ok
+            end
+
+            -- Vị trí NPC Craft
+            local Craft_CFrame = CFrame.new(5864.833008, 1209.483032, 811.329224)
+
+            -- Bay đến NPC Craft
+            ActionStatus.Text = "Hành động: [3.2] Đang bay đến NPC Craft..."
+            warn("[DracoAuto] [3.2] TweenTo Craft NPC...")
+            local arrived = TweenTo(Craft_CFrame)
+
+            if arrived then
+                task.wait(0.3)
+
+                -- Gọi requestEntrance trước
+                ActionStatus.Text = "Hành động: [3.2] Đang gọi requestEntrance..."
+                RequestEntrance()
+                task.wait(0.5)
+
+                -- Craft Dragonheart nếu chưa có
+                if not hasHeartNow then
+                    ActionStatus.Text = "Hành động: [3.2] Đang craft Dragonheart..."
+                    warn("[DracoAuto] [3.2] Craft Dragonheart...")
+                    CraftItem("Dragonheart")
+                    task.wait(3)
+                end
+
+                -- Craft Dragonstorm nếu chưa có
+                if not hasStormNow then
+                    ActionStatus.Text = "Hành động: [3.2] Đang craft Dragonstorm..."
+                    warn("[DracoAuto] [3.2] Craft Dragonstorm...")
+                    CraftItem("Dragonstorm")
+                    task.wait(3)
+                end
+
+                -- Kiểm tra lại sau craft
+                local invAfter, _ = GetInventory()
+                local heartAfter, _ = HasItem(invAfter, "Dragonheart")
+                local stormAfter, _ = HasItem(invAfter, "Dragonstorm")
+
+                WeaponRowLabel.Text = string.format(
+                    "Heart: %s  |  Storm: %s",
+                    heartAfter and "✅" or "❌",
+                    stormAfter and "✅" or "❌"
+                )
+
+                if heartAfter and stormAfter then
+                    -- Craft xong → kick để rejoin bước tiếp
+                    ActionStatus.Text = "Hành động: [3.2] ✅ Craft xong Heart + Storm! Đang Kick..."
+                    warn("[DracoAuto] [3.2] Craft xong cả hai → Kick!")
+                    task.wait(2)
+                    Player:Kick("\n[ Draco Auto ]\nCraft xong Dragonheart & Dragonstorm!\nRejoin để tiến hành farm Mastery.")
+                else
+                    ActionStatus.Text = string.format(
+                        "Hành động: [3.2] ⚠ Craft chưa đủ! Heart:%s Storm:%s — kiểm tra nguyên liệu!",
+                        heartAfter and "✅" or "❌",
+                        stormAfter and "✅" or "❌"
+                    )
+                    warn("[DracoAuto] [3.2] Craft chưa đủ, cần kiểm tra lại nguyên liệu!")
+                end
+
+            else
+                ActionStatus.Text = "Hành động: [3.2] ❌ Bay đến NPC Craft thất bại!"
+                warn("[DracoAuto] [3.2] TweenTo Craft NPC thất bại!")
+            end
+        end
+    end
+end
+
+-- ==========================================
+-- [ 3.3 ] (SẼ LÀM SAU - Farm Mastery)
 -- ==========================================
