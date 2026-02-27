@@ -1,6 +1,6 @@
 --[[
-    🏆 TITLE CHECKER - BLOX FRUITS
-    Check 14 danh hiệu Race V2/V3
+    🏆 TITLE CHECKER V3 - BLOX FRUITS
+    Mở bảng Title game → scan GUI → check 14 race title
 ]]
 
 if getgenv().TC then pcall(getgenv().TC) end
@@ -8,6 +8,7 @@ if getgenv().TC then pcall(getgenv().TC) end
 local player = game:GetService("Players").LocalPlayer
 local TS = game:GetService("TweenService")
 local UIS = game:GetService("UserInputService")
+local playerGui = player:WaitForChild("PlayerGui")
 local CommF_ = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CommF_")
 
 -- 14 title cần check
@@ -28,36 +29,78 @@ local Titles = {
     {n="Ancient Flame",      r="Unlock Draco V3",  v=3},
 }
 
--- Lấy danh sách title từ server (giống Spy V2)
-local owned = {}
+-- Bước 1: Mở bảng Titles game
 pcall(function()
-    local result = CommF_:InvokeServer("getTitles")
-    if type(result) == "table" then
-        for k, _ in pairs(result) do
-            owned[tostring(k)] = true
+    CommF_:InvokeServer("getTitles")
+end)
+pcall(function()
+    local m = playerGui:FindFirstChild("Main")
+    if m and m:FindFirstChild("Titles") then
+        m.Titles.Visible = true
+    end
+end)
+
+-- Bước 2: Đợi GUI load
+task.wait(1.5)
+
+-- Bước 3: Scan tất cả text trong Titles GUI
+local found = {}
+pcall(function()
+    local m = playerGui:FindFirstChild("Main")
+    if m then
+        local titlesFrame = m:FindFirstChild("Titles")
+        if titlesFrame then
+            for _, desc in pairs(titlesFrame:GetDescendants()) do
+                if desc:IsA("TextLabel") or desc:IsA("TextButton") then
+                    local txt = desc.Text
+                    if txt and #txt > 2 then
+                        found[txt] = true
+                    end
+                end
+            end
         end
     end
 end)
 
--- GUI
+-- Ẩn lại bảng title game
+pcall(function()
+    local m = playerGui:FindFirstChild("Main")
+    if m and m:FindFirstChild("Titles") then
+        m.Titles.Visible = false
+    end
+end)
+
+-- Check: title có trong GUI = đã sở hữu
+local owned = {}
+for _, t in pairs(Titles) do
+    owned[t.n] = found[t.n] or false
+end
+
+-- Debug: in ra console
+local has = 0
+for _, t in pairs(Titles) do if owned[t.n] then has = has + 1 end end
+print("🏆 Title Checker: Tìm thấy " .. has .. "/14 race titles")
+print("📋 Tổng text scan được: " .. (function() local c=0; for _ in pairs(found) do c=c+1 end; return c end)())
+
+-- ═══════════ GUI ═══════════
 local gui = Instance.new("ScreenGui")
-gui.Name = "TC"
+gui.Name = "TitleChecker"
 gui.ResetOnSpawn = false
 pcall(function() gui.Parent = game:GetService("CoreGui") end)
-if not gui.Parent then gui.Parent = player.PlayerGui end
+if not gui.Parent then gui.Parent = playerGui end
 
 local main = Instance.new("Frame")
-main.Size = UDim2.new(0, 340, 0, 0)
+main.Size = UDim2.new(0, 340, 0, 38)
 main.Position = UDim2.new(0.5, -170, 0.5, -240)
 main.BackgroundColor3 = Color3.fromRGB(18, 16, 28)
 main.BorderSizePixel = 0
 main.Active = true
 main.Draggable = true
+main.ClipsDescendants = true
 main.Parent = gui
 Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
-local mStroke = Instance.new("UIStroke", main)
-mStroke.Color = Color3.fromRGB(200, 170, 50)
-mStroke.Thickness = 2
+Instance.new("UIStroke", main).Color = Color3.fromRGB(200, 170, 50)
+Instance.new("UIStroke", main).Thickness = 2
 
 -- Title bar
 local bar = Instance.new("Frame")
@@ -66,6 +109,7 @@ bar.BackgroundColor3 = Color3.fromRGB(25, 22, 40)
 bar.BorderSizePixel = 0
 bar.Parent = main
 Instance.new("UICorner", bar).CornerRadius = UDim.new(0, 10)
+
 local barFix = Instance.new("Frame")
 barFix.Size = UDim2.new(1, 0, 0, 10)
 barFix.Position = UDim2.new(0, 0, 1, -10)
@@ -73,20 +117,16 @@ barFix.BackgroundColor3 = Color3.fromRGB(25, 22, 40)
 barFix.BorderSizePixel = 0
 barFix.Parent = bar
 
--- Count
-local has = 0
-for _, t in pairs(Titles) do if owned[t.n] then has = has + 1 end end
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -40, 1, 0)
-title.Position = UDim2.new(0, 12, 0, 0)
-title.BackgroundTransparency = 1
-title.Text = "🏆 RACE TITLES  " .. has .. "/14"
-title.TextColor3 = Color3.fromRGB(220, 190, 60)
-title.TextSize = 14
-title.Font = Enum.Font.GothamBold
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.Parent = bar
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -40, 1, 0)
+titleLabel.Position = UDim2.new(0, 12, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "🏆 RACE TITLES  " .. has .. "/14"
+titleLabel.TextColor3 = Color3.fromRGB(220, 190, 60)
+titleLabel.TextSize = 14
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = bar
 
 local closeBtn = Instance.new("TextButton")
 closeBtn.Size = UDim2.new(0, 26, 0, 26)
@@ -110,7 +150,7 @@ pBar.Parent = main
 Instance.new("UICorner", pBar).CornerRadius = UDim.new(1, 0)
 
 local pFill = Instance.new("Frame")
-pFill.Size = UDim2.new(has / 14, 0, 1, 0)
+pFill.Size = UDim2.new(has/14, 0, 1, 0)
 pFill.BackgroundColor3 = has == 14 and Color3.fromRGB(80, 220, 80) or Color3.fromRGB(200, 170, 50)
 pFill.BorderSizePixel = 0
 pFill.Parent = pBar
@@ -131,7 +171,6 @@ lay.Padding = UDim.new(0, 3)
 lay.SortOrder = Enum.SortOrder.LayoutOrder
 lay.Parent = scroll
 
--- Build rows
 local function Header(text, order)
     local h = Instance.new("TextLabel")
     h.Size = UDim2.new(1, -6, 0, 24)
@@ -148,8 +187,7 @@ local function Header(text, order)
 end
 
 local function Row(info, order)
-    local ok = owned[info.n] or false
-
+    local ok = owned[info.n]
     local row = Instance.new("Frame")
     row.Size = UDim2.new(1, -6, 0, 36)
     row.BackgroundColor3 = ok and Color3.fromRGB(18, 32, 18) or Color3.fromRGB(28, 24, 38)
@@ -157,11 +195,8 @@ local function Row(info, order)
     row.LayoutOrder = order
     row.Parent = scroll
     Instance.new("UICorner", row).CornerRadius = UDim.new(0, 7)
-    local s = Instance.new("UIStroke", row)
-    s.Color = ok and Color3.fromRGB(50, 130, 50) or Color3.fromRGB(50, 42, 65)
-    s.Thickness = 1
+    Instance.new("UIStroke", row).Color = ok and Color3.fromRGB(50, 130, 50) or Color3.fromRGB(50, 42, 65)
 
-    -- ✓ or ✗
     local icon = Instance.new("TextLabel")
     icon.Size = UDim2.new(0, 28, 0, 28)
     icon.Position = UDim2.new(0, 4, 0.5, -14)
@@ -173,7 +208,6 @@ local function Row(info, order)
     icon.Parent = row
     Instance.new("UICorner", icon).CornerRadius = UDim.new(0, 7)
 
-    -- Name
     local nm = Instance.new("TextLabel")
     nm.Size = UDim2.new(1, -120, 0, 18)
     nm.Position = UDim2.new(0, 38, 0, 1)
@@ -185,7 +219,6 @@ local function Row(info, order)
     nm.TextXAlignment = Enum.TextXAlignment.Left
     nm.Parent = row
 
-    -- Requirement
     local rq = Instance.new("TextLabel")
     rq.Size = UDim2.new(1, -120, 0, 14)
     rq.Position = UDim2.new(0, 38, 0, 19)
@@ -197,7 +230,6 @@ local function Row(info, order)
     rq.TextXAlignment = Enum.TextXAlignment.Left
     rq.Parent = row
 
-    -- Status
     local st = Instance.new("TextLabel")
     st.Size = UDim2.new(0, 55, 0, 20)
     st.Position = UDim2.new(1, -62, 0.5, -10)
@@ -210,7 +242,6 @@ local function Row(info, order)
     Instance.new("UICorner", st).CornerRadius = UDim.new(0, 5)
 end
 
--- Render
 Header("⚔ RACE V2", 0)
 local ord = 1
 for _, t in pairs(Titles) do
@@ -222,17 +253,14 @@ for _, t in pairs(Titles) do
     if t.v == 3 then Row(t, ord); ord = ord + 1 end
 end
 
--- Canvas
 task.wait()
 scroll.CanvasSize = UDim2.new(0, 0, 0, lay.AbsoluteContentSize.Y + 8)
 
 -- Animate open
-main.Size = UDim2.new(0, 340, 0, 38)
-TS:Create(main, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+TS:Create(main, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
     Size = UDim2.new(0, 340, 0, 480)
 }):Play()
 
--- Close + keybind
 closeBtn.MouseButton1Click:Connect(function()
     getgenv().TC = nil; gui:Destroy()
 end)
@@ -243,4 +271,4 @@ UIS.InputBegan:Connect(function(i, g)
     if i.KeyCode == Enum.KeyCode.RightShift then gui.Enabled = not gui.Enabled end
 end)
 
-print("🏆 Title Checker | "..has.."/14 | RightShift = ẩn/hiện")
+print("🏆 Title Checker V3 | "..has.."/14 | RightShift = ẩn/hiện")
