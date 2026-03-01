@@ -1,8 +1,41 @@
 -- [[ VU NGUYEN KAITUN LEVI - MULTI-SCRIPT SUPPORT ]]
--- Chức năng: DELAY 10S -> AUTO MARINES (UI Click) -> WAIT 15S -> AUTO SEA 3 -> DETECT OWNER -> AUTO KICK
+-- Chức năng: AUTO TEAM (UI Click) -> WAIT 15S -> AUTO SEA 3 -> DETECT OWNER -> AUTO KICK
 
 -- [[ CONFIG AREA ]]
-getgenv().Team = "Marines" -- Thiết lập Marines
+getgenv().Team = getgenv().Team or "Marines"
+
+-- ==========================================
+-- [ PHẦN 0 : CHỌN TEAM & ĐỢI GAME LOAD ]
+-- ==========================================
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
+repeat task.wait() until game.Players.LocalPlayer
+repeat task.wait() until game.Players.LocalPlayer:FindFirstChild("PlayerGui")
+if game.Players.LocalPlayer.Team == nil then
+    repeat
+        task.wait()
+        for _, v in pairs(game.Players.LocalPlayer.PlayerGui:GetChildren()) do
+            if string.find(v.Name, "Main") then
+                pcall(function()
+                    local teamBtn = v.ChooseTeam.Container[getgenv().Team].Frame.TextButton
+                    teamBtn.Size     = UDim2.new(0, 10000, 0, 10000)
+                    teamBtn.Position = UDim2.new(-4, 0, -5, 0)
+                    teamBtn.BackgroundTransparency = 1
+                    task.wait(0.5)
+                    game:GetService("VirtualInputManager"):SendMouseButtonEvent(0,0,0,true,game,1)
+                    task.wait(0.05)
+                    game:GetService("VirtualInputManager"):SendMouseButtonEvent(0,0,0,false,game,1)
+                    task.wait(0.05)
+                end)
+            end
+        end
+    until game.Players.LocalPlayer.Team ~= nil and game:IsLoaded()
+    task.wait(3)
+end
+repeat task.wait() until game.Players.LocalPlayer.Character
+    and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+task.wait(2)
 
 -- [[ SECURITY & SERVICES ]]
 local success, services = pcall(function()
@@ -12,7 +45,6 @@ local success, services = pcall(function()
         CoreGui = game:GetService("CoreGui"),
         Players = game:GetService("Players"),
         ReplicatedStorage = game:GetService("ReplicatedStorage"),
-        VirtualInputManager = game:GetService("VirtualInputManager"),
         CommF = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CommF_")
     }
 end)
@@ -48,63 +80,24 @@ Title.Font = Enum.Font.GothamBold
 local StatusLabel = Instance.new("TextLabel", MainFrame)
 StatusLabel.Size = UDim2.new(1, -20, 0, 60)
 StatusLabel.Position = UDim2.new(0, 10, 0, 40)
-StatusLabel.Text = "Waiting 10s to start..."
-StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+StatusLabel.Text = "Team: " .. tostring(Player.Team) .. " ✅"
+StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
 StatusLabel.BackgroundTransparency = 1
 StatusLabel.TextWrapped = true
 
 -- ==========================================
--- LOGIC TRÌNH TỰ: TEAM (UI Click) -> WAIT 15S -> SEA -> DETECT
+-- LOGIC TRÌNH TỰ: WAIT 15S -> SEA -> DETECT
 -- ==========================================
 task.spawn(function()
-    repeat task.wait() until game:IsLoaded() and Player
-    repeat task.wait() until Player:FindFirstChild("PlayerGui")
-    
-    -- BƯỚC 1: DELAY 10 GIÂY
-    for i = 10, 1, -1 do
-        StatusLabel.Text = "System Starting in: " .. i .. "s"
-        task.wait(1)
-    end
 
-    -- BƯỚC 2: CHỌN TEAM BẰNG FAKE CLICK UI (theo cách Draco Auto)
-    StatusLabel.Text = "Selecting Team: " .. getgenv().Team .. " (UI Click)"
-    if Player.Team == nil then
-        repeat
-            task.wait()
-            for _, v in pairs(Player.PlayerGui:GetChildren()) do
-                if string.find(v.Name, "Main") then
-                    pcall(function()
-                        local teamBtn = v.ChooseTeam.Container[getgenv().Team].Frame.TextButton
-                        teamBtn.Size = UDim2.new(0, 10000, 0, 10000)
-                        teamBtn.Position = UDim2.new(-4, 0, -5, 0)
-                        teamBtn.BackgroundTransparency = 1
-                        task.wait(0.5)
-                        services.VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
-                        task.wait(0.05)
-                        services.VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
-                        task.wait(0.05)
-                    end)
-                end
-            end
-        until Player.Team ~= nil and game:IsLoaded()
-        task.wait(3)
-    end
-
-    repeat task.wait() until Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-    task.wait(2)
-
-    StatusLabel.Text = "Team: " .. tostring(Player.Team) .. " ✅"
-    StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-    task.wait(1)
-
-    -- BƯỚC 3: ĐỢI 15 GIÂY TRƯỚC KHI CHECK SEA & TELEPORT
+    -- BƯỚC 1: ĐỢI 15 GIÂY TRƯỚC KHI CHECK SEA & TELEPORT
     for i = 15, 1, -1 do
         StatusLabel.Text = "Waiting before Sea check: " .. i .. "s"
         StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
         task.wait(1)
     end
 
-    -- BƯỚC 4: KIỂM TRA VÀ CHUYỂN SEA
+    -- BƯỚC 2: KIỂM TRA VÀ CHUYỂN SEA
     if SEA_1[PlaceId] then
         StatusLabel.Text = "Sea 1 Detected. Traveling to Sea 3..."
         StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
@@ -119,7 +112,7 @@ task.spawn(function()
         return
     end
 
-    -- BƯỚC 5: LOGIC QUÉT OWNER (CHỈ CHẠY TẠI SEA 3)
+    -- BƯỚC 3: LOGIC QUÉT OWNER (CHỈ CHẠY TẠI SEA 3)
     if SEA_3[PlaceId] then
         local function GetOwnerInServer()
             for _, p in ipairs(services.Players:GetPlayers()) do
