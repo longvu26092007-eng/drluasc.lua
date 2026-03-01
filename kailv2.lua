@@ -1,5 +1,5 @@
 -- [[ VU NGUYEN KAITUN LEVI - MULTI-SCRIPT SUPPORT ]]
--- Chức năng: DELAY 10S -> AUTO MARINES -> WAIT 15S -> AUTO SEA 3 -> DETECT OWNER -> AUTO KICK
+-- Chức năng: DELAY 10S -> AUTO MARINES (UI Click) -> WAIT 15S -> AUTO SEA 3 -> DETECT OWNER -> AUTO KICK
 
 -- [[ CONFIG AREA ]]
 getgenv().Team = "Marines" -- Thiết lập Marines
@@ -12,6 +12,7 @@ local success, services = pcall(function()
         CoreGui = game:GetService("CoreGui"),
         Players = game:GetService("Players"),
         ReplicatedStorage = game:GetService("ReplicatedStorage"),
+        VirtualInputManager = game:GetService("VirtualInputManager"),
         CommF = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CommF_")
     }
 end)
@@ -53,10 +54,11 @@ StatusLabel.BackgroundTransparency = 1
 StatusLabel.TextWrapped = true
 
 -- ==========================================
--- LOGIC TRÌNH TỰ: TEAM -> WAIT 15S -> SEA -> DETECT
+-- LOGIC TRÌNH TỰ: TEAM (UI Click) -> WAIT 15S -> SEA -> DETECT
 -- ==========================================
 task.spawn(function()
     repeat task.wait() until game:IsLoaded() and Player
+    repeat task.wait() until Player:FindFirstChild("PlayerGui")
     
     -- BƯỚC 1: DELAY 10 GIÂY
     for i = 10, 1, -1 do
@@ -64,14 +66,35 @@ task.spawn(function()
         task.wait(1)
     end
 
-    -- BƯỚC 2: CHỌN TEAM MARINES (CHỜ ĐẾN KHI XONG)
-    StatusLabel.Text = "Selecting Team: " .. getgenv().Team
+    -- BƯỚC 2: CHỌN TEAM BẰNG FAKE CLICK UI (theo cách Draco Auto)
+    StatusLabel.Text = "Selecting Team: " .. getgenv().Team .. " (UI Click)"
     if Player.Team == nil then
-        repeat 
-            task.wait(0.5) 
-            services.CommF:InvokeServer("SetTeam", getgenv().Team) 
-        until Player.Team ~= nil
+        repeat
+            task.wait()
+            for _, v in pairs(Player.PlayerGui:GetChildren()) do
+                if string.find(v.Name, "Main") then
+                    pcall(function()
+                        local teamBtn = v.ChooseTeam.Container[getgenv().Team].Frame.TextButton
+                        teamBtn.Size = UDim2.new(0, 10000, 0, 10000)
+                        teamBtn.Position = UDim2.new(-4, 0, -5, 0)
+                        teamBtn.BackgroundTransparency = 1
+                        task.wait(0.5)
+                        services.VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+                        task.wait(0.05)
+                        services.VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+                        task.wait(0.05)
+                    end)
+                end
+            end
+        until Player.Team ~= nil and game:IsLoaded()
+        task.wait(3)
     end
+
+    repeat task.wait() until Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+    task.wait(2)
+
+    StatusLabel.Text = "Team: " .. tostring(Player.Team) .. " ✅"
+    StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
     task.wait(1)
 
     -- BƯỚC 3: ĐỢI 15 GIÂY TRƯỚC KHI CHECK SEA & TELEPORT
@@ -86,13 +109,13 @@ task.spawn(function()
         StatusLabel.Text = "Sea 1 Detected. Traveling to Sea 3..."
         StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
         task.wait(1)
-        services.CommF:InvokeServer("TravelDressrosa") -- Qua Sea 2
+        services.CommF:InvokeServer("TravelDressrosa")
         return
     elseif SEA_2[PlaceId] then
         StatusLabel.Text = "Sea 2 Detected. Traveling to Sea 3..."
         StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
         task.wait(1)
-        services.CommF:InvokeServer("TravelZou") -- Lên Sea 3
+        services.CommF:InvokeServer("TravelZou")
         return
     end
 
@@ -147,7 +170,6 @@ task.spawn(function()
                 Player:Kick("Không tìm thấy chủ tàu sau 20s quét.")
             end
         else
-            -- LOGIC DÀNH CHO CHỦ TÀU
             StatusLabel.Text = "Main Account Mode Active.\nLoading Leviathan Script..."
             getgenv().Key = "1f34f32b6f1917a66d57e8c6"
             loadstring(game:HttpGet("https://raw.githubusercontent.com/obiiyeuem/vthangsitink/main/BananaCat-KaitunLevi.lua"))()
