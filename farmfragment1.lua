@@ -5,7 +5,7 @@
 
 -- [[ CONFIG ]]
 getgenv().Team = getgenv().Team or "Marines"
-local FRAGMENT_MIN = 8000
+local FRAGMENT_MIN = 15000
 
 -- ==========================================
 -- [ PHẦN 0 : CHỌN TEAM & ĐỢI GAME LOAD ]
