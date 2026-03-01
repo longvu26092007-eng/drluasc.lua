@@ -167,7 +167,7 @@ task.spawn(function()
             StatusLabel.Text = "Main Account Mode Active.\nWaiting 120s before execute..."
             StatusLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
             
-            for i = 120, 1, -1 do
+            for i = 190, 1, -1 do
                 StatusLabel.Text = string.format("Owner Mode: Waiting %d:%02d before execute...", math.floor(i/60), i%60)
                 StatusLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
                 task.wait(1)
