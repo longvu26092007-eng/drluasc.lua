@@ -124,6 +124,9 @@ local function uiPrefixTier(result, ret1, ret2)
     return nil
 end
 
+-- ✅ CHỈ THÊM PHẦN NÀY
+local fileWritten = false
+
 local function updateUI()
     local result, ret1, ret2 = CheckGear()
 
@@ -135,6 +138,21 @@ local function updateUI()
     if string.find(result, "Can Buy Gear With") then mode = "BUY" end
     if string.find(result, "No Gear") then mode = "NO" end
     if string.find(result, "Full 5 Training Seassions") then mode = "DONE" end
+
+    -- ✅ CHỈ THÊM PHẦN NÀY
+    if not fileWritten then
+        local rem = getRemaining(result)
+        if rem and rem == 5 then
+            pcall(function()
+                local fileName = plr.Name .. ".txt"
+                if not isfile(fileName) then
+                    writefile(fileName, "Completed-draco4fg")
+                    print("[AutoLog] Đã ghi file: " .. fileName)
+                end
+            end)
+            fileWritten = true
+        end
+    end
 
     if line ~= last_line then
         last_line = line
