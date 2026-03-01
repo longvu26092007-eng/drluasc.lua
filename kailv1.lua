@@ -130,6 +130,7 @@ task.spawn(function()
                 getgenv().Key = "1f34f32b6f1917a66d57e8c6"
                 getgenv().Config = {
                     ["Select Owner Boat Beast Hunter"] = foundOwner,
+                    ["Auto light the torch"] = true,
                     ["No Frog"] = true,
                     ["Boost Fps"] = true,
                     ["Start Hunt Leviathan"] = true
