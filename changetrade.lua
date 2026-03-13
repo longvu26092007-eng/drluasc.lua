@@ -1,22 +1,24 @@
 -- ==========================================
--- SCRIPT CHECK DOJO BELT (WHITE) - FIXED NAME
+-- SCRIPT CHECK DOJO BELT (YELLOW) - BY GEMINI
 -- ==========================================
 local Player = game.Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+-- Chờ Remote tồn tại
 local CommF = ReplicatedStorage:WaitForChild("Remotes", 30):WaitForChild("CommF_", 30)
 
+-- Tạo UI nhỏ ở góc màn hình để theo dõi trạng thái
 local function CreateMiniUI()
     local SafeGuiParent = pcall(function() return gethui() end) and gethui() 
         or CoreGui:FindFirstChild("RobloxGui") or CoreGui
     
-    if SafeGuiParent:FindFirstChild("WhiteBeltStatusUI") then
-        SafeGuiParent.WhiteBeltStatusUI:Destroy()
+    if SafeGuiParent:FindFirstChild("YellowBeltStatusUI") then
+        SafeGuiParent.YellowBeltStatusUI:Destroy()
     end
 
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "WhiteBeltStatusUI"
+    ScreenGui.Name = "YellowBeltStatusUI"
     ScreenGui.Parent = SafeGuiParent
     ScreenGui.ResetOnSpawn = false
 
@@ -34,7 +36,7 @@ local function CreateMiniUI()
     StatusText.Name = "StatusLabel"
     StatusText.Size = UDim2.new(1, 0, 1, 0)
     StatusText.BackgroundTransparency = 1
-    StatusText.Text = "🔍 Đang khởi tạo..."
+    StatusText.Text = "🔍 Khởi tạo Check Yellow..."
     StatusText.TextColor3 = Color3.fromRGB(255, 255, 255)
     StatusText.Font = Enum.Font.GothamBold
     StatusText.TextSize = 12
@@ -45,9 +47,9 @@ end
 
 local StatusLabel, MainFrame, Stroke = CreateMiniUI()
 
-local function CheckWhiteBeltAndSave()
+local function CheckYellowBeltAndSave()
     if not CommF then
-        StatusLabel.Text = "⏳ Đang đợi Remote..."
+        StatusLabel.Text = "⏳ Đợi Remote (CommF_)..."
         return false
     end
 
@@ -56,20 +58,20 @@ local function CheckWhiteBeltAndSave()
     end)
 
     if ok and type(inv) == "table" then
-        StatusLabel.Text = "🔍 Đang quét Inventory..."
+        StatusLabel.Text = "🔍 Đang quét Inventory (15s)..."
         
-        local hasWhiteBelt = false
+        local hasYellowBelt = false
         for _, item in pairs(inv) do
             if type(item) == "table" then
-                -- FIX: Tên chính xác trong game là "Dojo Belt (White)"
-                if item.Name == "Dojo Belt (White)" or item.Name == "White Belt" then
-                    hasWhiteBelt = true
+                -- Nhận diện Dojo Belt (Yellow)
+                if item.Name == "Dojo Belt (Yellow)" then
+                    hasYellowBelt = true
                     break
                 end
             end
         end
 
-        if hasWhiteBelt then
+        if hasYellowBelt then
             local fileName = Player.Name .. ".txt"
             local content = "Completed-trade"
             
@@ -77,15 +79,15 @@ local function CheckWhiteBeltAndSave()
                 writefile(fileName, content)
             end)
             
-            StatusLabel.Text = "✅ ĐÃ TÌM THẤY DOJO BELT!"
-            StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 127)
-            Stroke.Color = Color3.fromRGB(0, 255, 127)
+            StatusLabel.Text = "✅ ĐÃ CÓ YELLOW BELT!"
+            StatusLabel.TextColor3 = Color3.fromRGB(255, 215, 0) -- Màu vàng cho rực rỡ
+            Stroke.Color = Color3.fromRGB(255, 215, 0)
             
-            warn("[DracoHub] Da tim thay Dojo Belt (White)! Da ghi file: " .. fileName)
+            warn("[DracoHub] Da tim thay Dojo Belt (Yellow)! Ghi file: " .. fileName)
             return true 
         else
-            StatusLabel.Text = "❌ KHÔNG TÌM THẤY ĐAI"
-            StatusLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
+            StatusLabel.Text = "❌ CHƯA CÓ YELLOW BELT"
+            StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
         end
     else
         StatusLabel.Text = "⚠️ Lỗi Inventory, đang thử lại..."
@@ -96,14 +98,15 @@ end
 
 task.spawn(function()
     if not game:IsLoaded() then game.Loaded:Wait() end
+    warn("[DracoHub] Bat dau vong lap check 15s cho Yellow Belt.")
     
     while true do
-        local success = CheckWhiteBeltAndSave()
+        local success = CheckYellowBeltAndSave()
         if success then 
-            task.wait(5)
+            task.wait(5) -- Giữ UI báo thành công trong 5s rồi xóa
             if MainFrame.Parent then MainFrame.Parent:Destroy() end
             break 
         end
-        task.wait(5)
+        task.wait(15) -- Check liên tiếp mỗi 15 giây theo yêu cầu của cậu
     end
 end)
