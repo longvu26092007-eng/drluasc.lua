@@ -441,28 +441,72 @@ local QUEST_BOSSES = {
 -- RAINBOW SAVIOUR CHECKER (từ Rainbow Checker)
 -- Check lần đầu + mỗi 30s, có → ghi file + dừng farm
 -- ==========================================
-local TargetTitle = "Unlock Rainbow Saviour."
 local rainbowDone = false
 
 local function CheckRainbowTitle()
+    -- Method 1: Gửi getTitles + quét UI
     pcall(function()
         COMMF_:InvokeServer("getTitles")
     end)
-    task.wait(1)
+    task.wait(2) -- đợi lâu hơn để UI render
 
     local found = false
+
+    -- Quét Main.Titles
     pcall(function()
         local mainUI = LocalPlayer.PlayerGui:FindFirstChild("Main")
-        local titlesUI = mainUI and mainUI:FindFirstChild("Titles")
-        if titlesUI then
-            for _, d in pairs(titlesUI:GetDescendants()) do
-                if (d:IsA("TextLabel") or d:IsA("TextButton")) and d.Text:find(TargetTitle, 1, true) then
-                    found = true
-                    break
+        if mainUI then
+            -- Tìm trong Titles
+            local titlesUI = mainUI:FindFirstChild("Titles")
+            if titlesUI then
+                for _, d in pairs(titlesUI:GetDescendants()) do
+                    if (d:IsA("TextLabel") or d:IsA("TextButton")) then
+                        local txt = d.Text:lower()
+                        if txt:find("rainbow") and txt:find("saviour") then
+                            found = true
+                            break
+                        end
+                        if txt:find("unlock rainbow") then
+                            found = true
+                            break
+                        end
+                    end
+                end
+            end
+
+            -- Fallback: quét toàn bộ Main nếu Titles không tìm thấy
+            if not found then
+                for _, d in pairs(mainUI:GetDescendants()) do
+                    if (d:IsA("TextLabel") or d:IsA("TextButton")) then
+                        local txt = d.Text:lower()
+                        if txt:find("rainbow") and (txt:find("saviour") or txt:find("haki")) then
+                            found = true
+                            break
+                        end
+                    end
                 end
             end
         end
     end)
+
+    -- Method 2: Check qua CommF_ trực tiếp
+    if not found then
+        pcall(function()
+            local titles = COMMF_:InvokeServer("getTitles")
+            if type(titles) == "table" then
+                for _, t in pairs(titles) do
+                    local name = (type(t) == "table" and (t.Name or t.name or t.Title or t.title)) or (type(t) == "string" and t) or ""
+                    if type(name) == "string" and name:lower():find("rainbow") then
+                        found = true
+                        break
+                    end
+                end
+            elseif type(titles) == "string" and titles:lower():find("rainbow") then
+                found = true
+            end
+        end)
+    end
+
     return found
 end
 
