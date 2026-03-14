@@ -438,44 +438,59 @@ local QUEST_BOSSES = {
 }
 
 -- ==========================================
--- RAINBOW SAVIOUR CHECKER (từ Rainbow Checker)
--- Check lần đầu + mỗi 30s, có → ghi file + dừng farm
+-- RAINBOW SAVIOUR CHECKER
+-- Check inventory Aura Skins + mỗi 30s, có → ghi file + dừng farm
 -- ==========================================
 local rainbowDone = false
 
-local function CheckRainbowTitle()
-    -- Method 1: Gửi getTitles + quét UI
-    pcall(function()
-        COMMF_:InvokeServer("getTitles")
-    end)
-    task.wait(2) -- đợi lâu hơn để UI render
-
+local function CheckRainbowHaki()
     local found = false
 
-    -- Quét Main.Titles
+    -- Method 1: Check inventory cho AuraSkin "Rainbow Saviour"
     pcall(function()
-        local mainUI = LocalPlayer.PlayerGui:FindFirstChild("Main")
-        if mainUI then
-            -- Tìm trong Titles
-            local titlesUI = mainUI:FindFirstChild("Titles")
-            if titlesUI then
-                for _, d in pairs(titlesUI:GetDescendants()) do
-                    if (d:IsA("TextLabel") or d:IsA("TextButton")) then
-                        local txt = d.Text:lower()
-                        if txt:find("rainbow") and txt:find("saviour") then
-                            found = true
-                            break
-                        end
-                        if txt:find("unlock rainbow") then
-                            found = true
-                            break
-                        end
+        local inv = COMMF_:InvokeServer("getInventory")
+        if type(inv) == "table" then
+            for _, item in pairs(inv) do
+                if type(item) == "table" then
+                    local name = item.Name or item.name or ""
+                    local itemType = item.Type or item.type or ""
+                    if type(name) == "string" and name:lower():find("rainbow") then
+                        found = true
+                        break
+                    end
+                    if type(itemType) == "string" and itemType == "AuraSkin" and type(name) == "string" and name:lower():find("rainbow") then
+                        found = true
+                        break
                     end
                 end
             end
+        end
+    end)
 
-            -- Fallback: quét toàn bộ Main nếu Titles không tìm thấy
-            if not found then
+    -- Method 2: Check qua RF/FruitCustomizerRF (xem có equip được không)
+    if not found then
+        pcall(function()
+            local result = RS.Modules.Net:FindFirstChild("RF/FruitCustomizerRF"):InvokeServer({
+                ["StorageName"] = "Rainbow Saviour",
+                ["Type"] = "AuraSkin",
+                ["Context"] = "Equip"
+            })
+            -- Nếu không lỗi / không trả về false → có item
+            if result ~= nil and result ~= false then
+                found = true
+            end
+        end)
+    end
+
+    -- Method 3: Fallback quét PlayerGui Titles (phòng trường hợp)
+    if not found then
+        pcall(function()
+            COMMF_:InvokeServer("getTitles")
+        end)
+        task.wait(2)
+        pcall(function()
+            local mainUI = LocalPlayer.PlayerGui:FindFirstChild("Main")
+            if mainUI then
                 for _, d in pairs(mainUI:GetDescendants()) do
                     if (d:IsA("TextLabel") or d:IsA("TextButton")) then
                         local txt = d.Text:lower()
@@ -485,24 +500,6 @@ local function CheckRainbowTitle()
                         end
                     end
                 end
-            end
-        end
-    end)
-
-    -- Method 2: Check qua CommF_ trực tiếp
-    if not found then
-        pcall(function()
-            local titles = COMMF_:InvokeServer("getTitles")
-            if type(titles) == "table" then
-                for _, t in pairs(titles) do
-                    local name = (type(t) == "table" and (t.Name or t.name or t.Title or t.title)) or (type(t) == "string" and t) or ""
-                    if type(name) == "string" and name:lower():find("rainbow") then
-                        found = true
-                        break
-                    end
-                end
-            elseif type(titles) == "string" and titles:lower():find("rainbow") then
-                found = true
             end
         end)
     end
@@ -536,7 +533,7 @@ end
 
 -- Check lần đầu trước khi farm
 StatusLabel.Text = "Đang check Rainbow Haki..."
-if CheckRainbowTitle() then
+if CheckRainbowHaki() then
     OnRainbowFound()
 end
 
@@ -544,7 +541,7 @@ end
 task.spawn(function()
     while task.wait(30) do
         if rainbowDone then break end
-        if CheckRainbowTitle() then
+        if CheckRainbowHaki() then
             OnRainbowFound()
             break
         end
