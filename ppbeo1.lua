@@ -2,7 +2,7 @@
     ╔══════════════════════════════════════════════════════════════════╗
     ║         DOJO PURPLE BELT - AUTO ELITE BOSS FARM + HOP          ║
     ║                     + UI TIẾN TRÌNH                             ║
-    ║  Fix: 7s timeout hop + Black Belt detect                        ║
+    ║  Fix: 7s timeout hop + Purple Belt inventory check               ║
     ╚══════════════════════════════════════════════════════════════════╝
 --]]
 
@@ -323,7 +323,7 @@ local function WriteCompletedFile(content)
 end
 local function AlreadyCompleted()
     local ok, c = pcall(function() if readfile and isfile and isfile(LocalPlayer.Name..".txt") then return readfile(LocalPlayer.Name..".txt") end; return nil end)
-    return ok and (c == "Completed-ppbelt" or c == "Completed-ppbeo")
+    return ok and c == "Completed-ppbelt"
 end
 
 -- Auto Buso
@@ -342,7 +342,17 @@ GuiService.ErrorMessageChanged:Connect(newcclosure(function() if GuiService:GetE
 -- ==========================================
 if AlreadyCompleted() then
     UL("status","✅ Đã hoàn thành từ trước!"); SLC("status",Color3.fromRGB(80,255,80))
-    AddLog("File completed đã tồn tại. Dừng."); return
+    AddLog("File Completed-ppbelt đã tồn tại. Dừng."); return
+end
+
+-- Hàm dừng toàn bộ khi đã có Purple Belt
+local function FinishPurpleBelt()
+    UL("status","🎉 ĐÃ CÓ PURPLE BELT TRONG INVENTORY!")
+    SLC("status", Color3.fromRGB(80, 255, 80))
+    AddLog("*** Tìm thấy Dojo Belt (Purple) → HOÀN THÀNH! ***")
+    WriteCompletedFile("Completed-ppbelt")
+    getgenv().PurpleBelt.Running = false
+    _noclipActive = false; RemoveBodyClip(); Tween(false)
 end
 
 task.spawn(function()
@@ -350,6 +360,9 @@ task.spawn(function()
 
     while getgenv().PurpleBelt.Running do
         xpcall(function()
+            -- ĐẦU MỖI LOOP: check Purple Belt trong inventory
+            if HasPurpleBelt() then FinishPurpleBelt(); return end
+
             if getgenv()._manualHop then getgenv()._manualHop = false; HopServer("Hop thủ công"); task.wait(getgenv().PurpleBelt.HopWaitTime); return end
 
             local isSea3 = CheckSea(3)
@@ -358,51 +371,35 @@ task.spawn(function()
 
             TeleportToHydra(); task.wait(1)
 
-            -- Bay đến Dojo Trainer (proximity check trong GetCurrentBeltName)
             if not EnsureNearDojo() then
                 AddLog("Không bay được đến Dojo, thử lại..."); task.wait(3); return
             end
 
+            -- Check inventory lần nữa sau khi đến Dojo
+            if HasPurpleBelt() then FinishPurpleBelt(); return end
+
             local beltName, progress = GetCurrentBeltName()
             UL("belt","🥋 Belt: "..(beltName or "N/A")); UL("progress","📊 Elite Killed: "..tostring(GetEliteProgress()))
 
-            -- =============================================
-            -- CHECK BLACK BELT → ghi file Completed-ppbeo
-            -- =============================================
-            if beltName == "Black" then
-                UL("status","🖤 Đã đến Black Belt!")
-                SLC("status", Color3.fromRGB(80, 255, 80))
-                AddLog("Detect Black Belt → Ghi file Completed-ppbeo")
-                WriteCompletedFile("Completed-ppbeo")
-                getgenv().PurpleBelt.Running = false
-                _noclipActive = false; RemoveBodyClip(); Tween(false)
-                return
-            end
-
-            -- Quest xong → claim
+            -- Quest xong → claim (đang đứng cạnh Dojo)
             if not progress and not beltName then
-                UL("status","🔍 Thử claim quest..."); ClaimDojoQuest(); task.wait(1)
-                local bn2, pr2 = GetCurrentBeltName()
-                -- Sau claim, nếu lên Black Belt
-                if bn2 == "Black" then
-                    UL("status","🖤 Đã lên Black Belt sau claim!")
-                    SLC("status", Color3.fromRGB(80, 255, 80))
-                    AddLog("Claim xong → Black Belt → Ghi Completed-ppbeo")
-                    WriteCompletedFile("Completed-ppbeo")
-                    getgenv().PurpleBelt.Running = false; Tween(false); return
-                end
-                if not pr2 and not bn2 then
-                    if HasPurpleBelt() then
-                        UL("status","🎉 HOÀN THÀNH PURPLE BELT!"); SLC("status",Color3.fromRGB(80,255,80))
-                        AddLog("*** PURPLE BELT ĐÃ XONG! ***"); WriteCompletedFile("Completed-ppbelt")
-                        getgenv().PurpleBelt.Running = false; _noclipActive = false; RemoveBodyClip(); Tween(false); return
-                    end
+                UL("status","🔍 Đứng cạnh Dojo → Claim quest...")
+                ClaimDojoQuest(); task.wait(1)
+                -- Sau claim check inventory
+                if HasPurpleBelt() then FinishPurpleBelt(); return end
+                local bn2 = GetCurrentBeltName()
+                if not bn2 then
+                    AddLog("Claim xong, không có quest mới → check inventory lần nữa")
+                    task.wait(2)
+                    if HasPurpleBelt() then FinishPurpleBelt(); return end
                 end
             end
 
-            -- Sai belt
-            if beltName and beltName ~= "Purple" and beltName ~= "Black" then
+            -- Sai belt (không phải Purple)
+            if beltName and beltName ~= "Purple" then
                 UL("status","⚠️ Belt: "..beltName.." (không phải Purple)"); AddLog("Belt: "..beltName)
+                -- Vẫn check inventory phòng trường hợp đã có từ trước
+                if HasPurpleBelt() then FinishPurpleBelt(); return end
                 task.wait(5); return
             end
 
@@ -412,12 +409,12 @@ task.spawn(function()
             if beltName == "Purple" then
                 UL("status","🟣 Purple Belt → Nhận quest Elite...")
 
-                -- Đứng cạnh Dojo Trainer → Claim quest cũ (nếu có) + Nhận quest Elite Hunter
+                -- Đứng cạnh Dojo → Claim quest cũ + Nhận quest Elite
                 ClaimDojoQuest()
                 task.wait(0.5)
                 AcceptEliteQuestAtDojo()
 
-                -- Chờ tối đa 7 giây để quest Elite xuất hiện trên GUI
+                -- Chờ tối đa 7 giây
                 local gotEliteQuest = false
                 local waitStart = tick()
 
@@ -440,9 +437,8 @@ task.spawn(function()
                 local qi = GetQuestInfo()
                 UL("quest","📜 Quest: "..(qi.visible and qi.text or "Không có"))
 
-                -- KHÔNG nhận được quest Elite trong 7s → HOP
                 if not gotEliteQuest then
-                    UL("status","🔄 7s timeout → Server không có Elite → Hop")
+                    UL("status","🔄 7s timeout → Hop")
                     UL("elite","👹 Elite Boss: KHÔNG CÓ ❌")
                     AddLog("7s không có quest Elite → Hop")
                     Tween(false); _noclipActive = false; RemoveBodyClip()
@@ -474,35 +470,21 @@ task.spawn(function()
                     Tween(false); _noclipActive = false; RemoveBodyClip()
                     AddLog(eName.." đã chết!"); UL("elite","👹 "..eName.." ĐÃ CHẾT ✅")
                     task.wait(2)
+
+                    -- Sau khi đánh xong → check inventory
+                    if HasPurpleBelt() then FinishPurpleBelt(); return end
+
+                    -- Bay về Dojo claim
+                    AddLog("Đánh xong → Bay về Dojo claim...")
+                    if EnsureNearDojo() then
+                        ClaimDojoQuest(); task.wait(1)
+                        if HasPurpleBelt() then FinishPurpleBelt(); return end
+                    end
                 else
-                    UL("status","🔄 Quest Elite có nhưng boss không thấy → Hop")
+                    UL("status","🔄 Boss không thấy → Hop")
                     AddLog("Boss không spawn → Hop")
                     Tween(false); _noclipActive = false; RemoveBodyClip()
                     HopServer("Boss không spawn"); task.wait(getgenv().PurpleBelt.HopWaitTime); return
-                end
-
-                -- Check hoàn thành sau khi đánh → bay về Dojo claim
-                AddLog("Đánh xong → Bay về Dojo check...")
-                if not EnsureNearDojo() then AddLog("Không về được Dojo"); task.wait(3); return end
-
-                local bnCheck, prCheck = GetCurrentBeltName()
-                if bnCheck == "Black" then
-                    UL("status","🖤 Lên Black Belt!"); SLC("status",Color3.fromRGB(80,255,80))
-                    AddLog("→ Black Belt → Ghi Completed-ppbeo")
-                    WriteCompletedFile("Completed-ppbeo")
-                    getgenv().PurpleBelt.Running = false; Tween(false); return
-                end
-                if not prCheck and not bnCheck then
-                    ClaimDojoQuest(); task.wait(1)
-                    local bnAfter = GetCurrentBeltName()
-                    if bnAfter == "Black" then
-                        UL("status","🖤 Claim → Black Belt!"); SLC("status",Color3.fromRGB(80,255,80))
-                        WriteCompletedFile("Completed-ppbeo"); getgenv().PurpleBelt.Running = false; Tween(false); return
-                    end
-                    if HasPurpleBelt() then
-                        UL("status","🎉 PURPLE BELT XONG!"); SLC("status",Color3.fromRGB(80,255,80))
-                        WriteCompletedFile("Completed-ppbelt"); getgenv().PurpleBelt.Running = false; Tween(false); return
-                    end
                 end
             end
 
