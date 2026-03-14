@@ -111,7 +111,7 @@ FragLabel.TextXAlignment         = Enum.TextXAlignment.Left
 
 local function RunFarmFragment()
     repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
-    getgenv().Key    = "1f34f32b6f1917a66d57e8c6"
+    getgenv().Key    = "51e126ee832d3c4fff7b6178"
     getgenv().NewUI  = true
     getgenv().Config = {
         ["Select Method Farm"] = "Farm Katakuri",
