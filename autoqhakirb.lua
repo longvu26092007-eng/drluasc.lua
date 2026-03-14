@@ -1,8 +1,8 @@
--- [[ AUTO RAINBOW HAKI v3 - TỔNG HỢP 5 FILE ]]
--- File 1/5: OldCFrame lock boss + hitbox 50x50 + AttackNoCoolDown
--- File 2: _tp BKP + requestEntrance (Hydra/Elephant/Pirate) + Attack.Kill loop + GetQFast
--- File 3/4: Freeze boss (JumpPower=0, WalkSpeed=0) + quest check mạnh
--- KaitunBoss: XOR FastAttack + __ServerBrowser hop + error handling
+-- [[ AUTO RAINBOW HAKI v4 ]]
+-- Di chuyển: Tween HRP (file 1 Tween2 style, speed 350)
+-- Bỏ: ChangeState(15) reset → tránh detect
+-- requestEntrance: Hydra Leader, Captain Elephant, Beautiful Pirate (file 2)
+-- Combat: XOR FastAttack (KaitunBoss) + LeftClickRemote (file 1/5) + OldCFrame lock + freeze
 
 -- ==========================================
 -- CONFIG
@@ -106,7 +106,7 @@ local function FastAttack(x)
 end
 
 -- ==========================================
--- ATTACK (LeftClickRemote fallback từ file 1/5)
+-- ATTACK (LeftClickRemote fallback)
 -- ==========================================
 local function AttackNoCoolDown()
     if not Character then return end
@@ -127,7 +127,7 @@ local function AttackNoCoolDown()
 end
 
 -- ==========================================
--- NOCLIP + BODYCLIP + ANTI STUN (file 1/3/4/5)
+-- NOCLIP + BODYCLIP + ANTI STUN
 -- ==========================================
 local _active = false
 
@@ -165,14 +165,45 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- BKP TELEPORT (file 2 _tp style)
+-- TWEEN DI CHUYỂN (file 1 Tween2 style, speed 350)
+-- Blocking: đợi đến nơi rồi return
+-- Không giật: chỉ gọi 1 lần, TweenService tự chạy
 -- ==========================================
-local function _tp(cf)
+local _currentTween = nil
+
+local function TweenTo(targetCF)
     if not HumanoidRootPart then return end
-    pcall(function()
-        Humanoid:ChangeState(15)
-        HumanoidRootPart.CFrame = cf; task.wait(); HumanoidRootPart.CFrame = cf
-    end)
+    -- Cancel tween cũ
+    if _currentTween then pcall(function() _currentTween:Cancel() end) _currentTween = nil end
+    pcall(function() Humanoid.Sit = false end)
+
+    local dist = (targetCF.Position - HumanoidRootPart.Position).Magnitude
+    if dist < 5 then return end -- đã gần
+
+    local speed = 350
+    local tweenTime = dist / speed
+    _currentTween = TweenService:Create(HumanoidRootPart, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = targetCF})
+    _currentTween:Play()
+    _currentTween.Completed:Wait()
+    _currentTween = nil
+end
+
+-- Non-blocking tween: không chờ, dùng cho combat loop
+local function TweenStart(targetCF)
+    if not HumanoidRootPart then return end
+    if _currentTween then pcall(function() _currentTween:Cancel() end) _currentTween = nil end
+    pcall(function() Humanoid.Sit = false end)
+
+    local dist = (targetCF.Position - HumanoidRootPart.Position).Magnitude
+    if dist < 5 then return end
+
+    local speed = 350
+    _currentTween = TweenService:Create(HumanoidRootPart, TweenInfo.new(dist/speed, Enum.EasingStyle.Linear), {CFrame = targetCF})
+    _currentTween:Play()
+end
+
+local function StopTween()
+    if _currentTween then pcall(function() _currentTween:Cancel() end) _currentTween = nil end
 end
 
 local function GetDist(pos)
@@ -209,7 +240,8 @@ local function AutoHaki()
 end
 
 -- ==========================================
--- KILL BOSS (tổng hợp: file 1/5 OldCFrame + file 2 Attack.Kill + file 3/4 freeze)
+-- KILL BOSS (OldCFrame lock + freeze + dual attack)
+-- Dùng TweenStart non-blocking để đến gần boss
 -- ==========================================
 local lastKen = tick()
 local function KillBoss(bossName)
@@ -229,28 +261,27 @@ local function KillBoss(bossName)
     local dist = GetDist(bhrp.Position)
 
     if dist > 70 then
-        _tp(bhrp.CFrame * CFrame.new(0, 20, 0))
+        TweenStart(bhrp.CFrame * CFrame.new(0, 20, 0))
         return false
     end
 
-    -- Lock boss vị trí (file 1/5 OldCFrame style)
+    -- Đã gần → dừng tween, lock boss, đánh
+    StopTween()
+
     local oldCF = bhrp.CFrame
     bhrp.CFrame = oldCF
     bhrp.CanCollide = false
     bhrp.Size = Vector3.new(50, 50, 50)
-    -- Freeze boss (file 3/4)
     pcall(function() boss.Humanoid.JumpPower = 0; boss.Humanoid.WalkSpeed = 0 end)
 
-    -- TP sát boss
-    _tp(CFrame.new(bhrp.Position + Vector3.new(0, 20, 0)))
+    -- Đứng sát boss
+    HumanoidRootPart.CFrame = CFrame.new(bhrp.Position + Vector3.new(0, 20, 0))
 
-    -- Dual attack
     EquipWeapon()
     AutoHaki()
     FastAttack(bossName)
     AttackNoCoolDown()
 
-    -- Ken mỗi 10s
     if tick() - lastKen >= 10 then
         lastKen = tick()
         pcall(function() RS.Remotes.CommE:FireServer("Ken", true) end)
@@ -259,7 +290,7 @@ local function KillBoss(bossName)
 end
 
 -- ==========================================
--- HOP SERVER (__ServerBrowser KaitunBoss)
+-- HOP SERVER (__ServerBrowser)
 -- ==========================================
 local function IfTableHaveIndex(j) for _ in j do return true end end
 local _lastPull, _cache
@@ -298,7 +329,7 @@ local function MakeLabel(y, text, color)
     l.TextXAlignment = Enum.TextXAlignment.Left; return l
 end
 
-local TitleL = MakeLabel(2, "Auto Rainbow Haki v3", Color3.fromRGB(255,200,0))
+local TitleL = MakeLabel(2, "Auto Rainbow Haki v4", Color3.fromRGB(255,200,0))
 TitleL.Font = Enum.Font.GothamBold; TitleL.TextSize = 13; TitleL.TextXAlignment = Enum.TextXAlignment.Center
 local StatusL = MakeLabel(28, "Weapon: "..getgenv().WeaponType.." | Starting...")
 StatusL.Font = Enum.Font.GothamSemibold
@@ -308,7 +339,7 @@ local BossL = MakeLabel(72, "Boss: ---")
 UIS.InputBegan:Connect(function(i, g) if not g and i.KeyCode == Enum.KeyCode.LeftAlt then frame.Visible = not frame.Visible end end)
 
 -- ==========================================
--- BOSS CONFIG (file 2 requestEntrance + file 1/3/4/5 locations)
+-- BOSS CONFIG (file 2 entrance + file 1/3/4/5 positions)
 -- ==========================================
 local NPC_POS = CFrame.new(-11892.0703125, 930.57672119141, -8760.1591796875)
 
@@ -329,7 +360,7 @@ local BOSSES = {
 }
 
 -- ==========================================
--- RAINBOW CHECKER (inventory + equip test)
+-- RAINBOW CHECKER
 -- ==========================================
 local rainbowDone = false
 
@@ -359,7 +390,7 @@ end
 
 local function OnFound()
     if rainbowDone then return end
-    rainbowDone = true; _active = false
+    rainbowDone = true; _active = false; StopTween()
     pcall(function() writefile(plr.Name..".txt","Completed-rainbow") end)
     warn("[Rainbow] ✅ DONE!")
     StatusL.Text = "✅ ĐÃ CÓ RAINBOW HAKI!"
@@ -369,11 +400,9 @@ local function OnFound()
     BossL.Text = "Dừng farm."; BossL.TextColor3 = Color3.fromRGB(0,255,0)
 end
 
--- Check lần đầu
 StatusL.Text = "Check Rainbow Haki..."
 if CheckRainbow() then OnFound() end
 
--- Background 30s
 task.spawn(function()
     while task.wait(30) do
         if rainbowDone then break end
@@ -382,7 +411,7 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- CHECK SEA 3 (HornedMan chỉ ở Sea 3)
+-- CHECK SEA 3
 -- ==========================================
 if not World3 and not rainbowDone then
     StatusL.Text = "TP Sea 3..."
@@ -391,7 +420,7 @@ if not World3 and not rainbowDone then
 end
 
 -- ==========================================
--- MAIN LOOP (file 2 logic + file 1/3/4/5 combat)
+-- MAIN LOOP
 -- ==========================================
 if not rainbowDone then _active = true end
 local _waitStart = nil
@@ -401,7 +430,6 @@ task.spawn(function()
     while task.wait(0.3) do
         if not _active then continue end
         xpcall(function()
-            -- Check quest visible (file 2: Quest.Visible == false/true)
             local questVisible = false
             local questText = ""
             pcall(function()
@@ -412,7 +440,7 @@ task.spawn(function()
             end)
 
             if not questVisible then
-                -- KHÔNG CÓ QUEST → đến HornedMan nhận (file 2 logic)
+                -- ĐẾN HORNEDMAN NHẬN QUEST
                 _waitStart = nil
                 QuestL.Text = "Quest: → HornedMan..."
                 QuestL.TextColor3 = Color3.fromRGB(255,100,100)
@@ -420,21 +448,20 @@ task.spawn(function()
 
                 local dist = GetDist(NPC_POS.Position)
                 if dist > 20 then
-                    StatusL.Text = "TP HornedMan..."
-                    _tp(NPC_POS)
-                else
-                    -- Đã đến → nhận quest (file 2: wait(1) rồi Bet)
-                    StatusL.Text = "Nhận quest..."
-                    task.wait(1)
-                    pcall(function() COMMF_:InvokeServer("HornedMan","Bet") end)
-                    StatusL.Text = "Đã nhận!"
-                    StatusL.TextColor3 = Color3.fromRGB(0,255,0)
-                    task.wait(2)
+                    StatusL.Text = "Tween HornedMan... "..math.floor(dist)
+                    TweenTo(NPC_POS) -- blocking tween, đợi đến nơi
                 end
+                -- Đã đến gần → nhận quest
+                StatusL.Text = "Nhận quest..."
+                task.wait(1)
+                pcall(function() COMMF_:InvokeServer("HornedMan","Bet") end)
+                StatusL.Text = "Đã nhận!"
+                StatusL.TextColor3 = Color3.fromRGB(0,255,0)
+                task.wait(2)
                 return
             end
 
-            -- CÓ QUEST → tìm boss
+            -- CÓ QUEST → match boss
             local matched = nil
             for _, cfg in ipairs(BOSSES) do
                 if string.find(questText, cfg.q) then matched = cfg break end
@@ -443,7 +470,6 @@ task.spawn(function()
             if not matched then
                 _waitStart = nil
                 QuestL.Text = "Quest: "..string.sub(questText,1,25)
-                -- Quest không match → quay lại HornedMan (file 3/4 fallback)
                 BossL.Text = "Boss: ???"
                 return
             end
@@ -451,7 +477,12 @@ task.spawn(function()
             QuestL.Text = "Quest: "..matched.q
             QuestL.TextColor3 = Color3.fromRGB(0,255,0)
 
-            -- Tìm boss (file 2: GetConnectionEnemies)
+            -- requestEntrance nếu boss cần cổng (file 2)
+            if matched.entrance then
+                pcall(function() COMMF_:InvokeServer("requestEntrance", matched.entrance) end)
+            end
+
+            -- Tìm boss
             local bossModel = nil
             for _, container in next, {workspace.Enemies, RS} do
                 for _, m in next, container:GetChildren() do
@@ -463,14 +494,13 @@ task.spawn(function()
             end
 
             if bossModel then
-                -- BOSS CÓ → đánh (file 2 Attack.Kill loop + file 1/5 OldCFrame)
+                -- BOSS CÓ → đánh
                 _waitStart = nil
                 local hp = math.floor(bossModel.Humanoid.Health / bossModel.Humanoid.MaxHealth * 100)
                 BossL.Text = "Boss: "..matched.boss.." | "..hp.."%"
                 BossL.TextColor3 = Color3.fromRGB(255,100,100)
                 StatusL.Text = "Fight "..matched.boss
 
-                -- repeat Attack.Kill until chết hoặc quest xong (file 2 style)
                 repeat
                     task.wait()
                     KillBoss(matched.boss)
@@ -479,21 +509,12 @@ task.spawn(function()
                     or bossModel.Humanoid.Health <= 0
                     or not plr.PlayerGui.Main.Quest.Visible
             else
-                -- BOSS CHƯA SPAWN
-                -- requestEntrance nếu cần (file 2: Hydra/Elephant/Pirate)
-                if matched.entrance then
-                    pcall(function()
-                        COMMF_:InvokeServer("requestEntrance", matched.entrance)
-                    end)
-                    task.wait(0.5)
-                end
-
-                -- TP đến vị trí boss
+                -- BOSS CHƯA SPAWN → tween đến vị trí chờ
                 if GetDist(matched.tp.Position) > 50 then
-                    _tp(matched.tp)
+                    StatusL.Text = "Tween "..matched.boss.."..."
+                    TweenStart(matched.tp) -- non-blocking
                 end
 
-                -- Đợi spawn, timeout → hop (KaitunBoss)
                 if not _waitStart then _waitStart = tick() end
                 local remain = WAIT_TIMEOUT - math.floor(tick() - _waitStart)
 
@@ -503,8 +524,8 @@ task.spawn(function()
                     StatusL.Text = "Waiting..."
                 else
                     _waitStart = nil
-                    BossL.Text = "HOP!"
-                    BossL.TextColor3 = Color3.fromRGB(255,0,0)
+                    StopTween()
+                    BossL.Text = "HOP!"; BossL.TextColor3 = Color3.fromRGB(255,0,0)
                     StatusL.Text = "Hop server..."
                     task.wait(1)
                     HopServer()
@@ -530,7 +551,7 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- ERROR HANDLING (KaitunBoss)
+-- ERROR HANDLING
 -- ==========================================
 TeleportService.TeleportInitFailed:Connect(function(_, res, msg)
     if res == Enum.TeleportResult.IsTeleporting and msg:find("previous teleport") then
@@ -543,4 +564,4 @@ GuiService.ErrorMessageChanged:Connect(newcclosure(function()
     end
 end))
 
-print("[Rainbow v3] ✅ | LeftAlt ẩn/hiện | "..getgenv().WeaponType)
+print("[Rainbow v4] ✅ | LeftAlt ẩn/hiện | "..getgenv().WeaponType)
