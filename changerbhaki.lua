@@ -11,7 +11,7 @@ local player = game:GetService("Players").LocalPlayer
 local UIS = game:GetService("UserInputService")
 local playerGui = player:WaitForChild("PlayerGui")
 
-local TargetTitle = "Unlock Rainbow Saviour aura color."
+local TargetTitle = "Unlock Rainbow Saviour."
 
 -- GUI SETUP (Sử dụng bảo mật cao hơn để tránh bị game xóa)
 local gui = Instance.new("ScreenGui")
