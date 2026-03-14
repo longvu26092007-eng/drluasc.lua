@@ -438,9 +438,81 @@ local QUEST_BOSSES = {
 }
 
 -- ==========================================
+-- RAINBOW SAVIOUR CHECKER (từ Rainbow Checker)
+-- Check lần đầu + mỗi 30s, có → ghi file + dừng farm
+-- ==========================================
+local TargetTitle = "Unlock Rainbow Saviour."
+local rainbowDone = false
+
+local function CheckRainbowTitle()
+    pcall(function()
+        COMMF_:InvokeServer("getTitles")
+    end)
+    task.wait(1)
+
+    local found = false
+    pcall(function()
+        local mainUI = LocalPlayer.PlayerGui:FindFirstChild("Main")
+        local titlesUI = mainUI and mainUI:FindFirstChild("Titles")
+        if titlesUI then
+            for _, d in pairs(titlesUI:GetDescendants()) do
+                if (d:IsA("TextLabel") or d:IsA("TextButton")) and d.Text:find(TargetTitle, 1, true) then
+                    found = true
+                    break
+                end
+            end
+        end
+    end)
+    return found
+end
+
+local function OnRainbowFound()
+    if rainbowDone then return end
+    rainbowDone = true
+    _rainbowActive = false
+
+    pcall(function()
+        writefile(LocalPlayer.Name .. ".txt", "Completed-rainbow")
+    end)
+    warn("[Rainbow] ✅ ĐÃ CÓ RAINBOW HAKI! File: " .. LocalPlayer.Name .. ".txt → Completed-rainbow")
+
+    StatusLabel.Text = "✅ ĐÃ CÓ RAINBOW HAKI!"
+    StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+    QuestLabel.Text = "🌈 Completed-rainbow!"
+    QuestLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+    BossLabel.Text = "Đã dừng farm."
+    BossLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+
+    Tween(false)
+    pcall(function()
+        local bc = HumanoidRootPart:FindFirstChild("BodyClip")
+        if bc then bc:Destroy() end
+    end)
+end
+
+-- Check lần đầu trước khi farm
+StatusLabel.Text = "Đang check Rainbow Haki..."
+if CheckRainbowTitle() then
+    OnRainbowFound()
+end
+
+-- Background checker mỗi 30s
+task.spawn(function()
+    while task.wait(30) do
+        if rainbowDone then break end
+        if CheckRainbowTitle() then
+            OnRainbowFound()
+            break
+        end
+    end
+end)
+
+-- ==========================================
 -- MAIN LOOP: Auto Rainbow Haki
 -- ==========================================
-_rainbowActive = true
+if not rainbowDone then
+    _rainbowActive = true
+end
 local _bossWaitStart = nil
 local BOSS_WAIT_TIMEOUT = 10 -- đợi boss 10s, không spawn → hop
 
