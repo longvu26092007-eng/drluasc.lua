@@ -236,7 +236,18 @@ local function EquipWeapon()
 end
 
 local function AutoHaki()
-    pcall(function() if not Character:FindFirstChild("HasBuso") then COMMF_:InvokeServer("Buso") end end)
+    pcall(function()
+        -- Check đã học Buso chưa (CollectionService tag từ KaitunBoss)
+        if not CollectionService:HasTag(Character, "Buso") then
+            -- Chưa học → mua Buso ($25,000 Beli)
+            COMMF_:InvokeServer("BuyHaki", "Buso")
+            task.wait(0.5)
+        end
+        -- Bật Buso nếu chưa active
+        if not Character:FindFirstChild("HasBuso") then
+            COMMF_:InvokeServer("Buso")
+        end
+    end)
 end
 
 -- ==========================================
@@ -480,6 +491,7 @@ task.spawn(function()
             -- requestEntrance nếu boss cần cổng (file 2)
             if matched.entrance then
                 pcall(function() COMMF_:InvokeServer("requestEntrance", matched.entrance) end)
+                task.wait(2) -- đợi cổng mở xong
             end
 
             -- Tìm boss
