@@ -1,4 +1,19 @@
 -- ==========================================
+-- [ KEY CHECK ] — Lấy key từ executor bên ngoài
+-- ==========================================
+-- Cách dùng ở executor:
+--   getgenv().Key = "51e126ee832d3c4fff7b6178"
+--   loadstring(game:HttpGet("...link git chứa lua..."))()
+-- ==========================================
+local NhapKey = getgenv().Key
+
+if not NhapKey or NhapKey == "" then
+    warn("[DracoAuto] ❌ Chưa set getgenv().Key ở executor! Hủy script.")
+    return
+end
+warn("[DracoAuto] ✅ Key nhận được: " .. string.sub(NhapKey, 1, 6) .. "***")
+
+-- ==========================================
 -- [ PHẦN 0 : CHỌN TEAM & ĐỢI GAME LOAD ]
 -- ==========================================
 getgenv().Team = getgenv().Team or "Marines"
@@ -127,7 +142,6 @@ local function getStats()
     return s
 end
 
--- Lấy mastery của vũ khí (tham khảo từ Draco Hub V1)
 local function GetWeaponMastery(weaponName)
     local p    = game.Players.LocalPlayer
     local item = p.Backpack:FindFirstChild(weaponName)
@@ -136,6 +150,26 @@ local function GetWeaponMastery(weaponName)
         return item.Level.Value
     end
     return 0
+end
+
+-- ==========================================
+-- [ PHẦN 1.6 ] HÀM GỌI BANANAHUB GỌN
+-- Dùng NhapKey từ executor, không hardcode key
+-- ==========================================
+local function LoadBananaHub(config)
+    repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
+    getgenv().Key    = NhapKey       -- ← key từ executor
+    getgenv().NewUI  = true
+    getgenv().Config = config
+    local ok, err = pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/obiiyeuem/vthangsitink/main/BananaHub.lua"))()
+    end)
+    if ok then
+        warn("[DracoAuto] BananaHub load OK! (key=" .. string.sub(NhapKey, 1, 6) .. "***)")
+    else
+        warn("[DracoAuto] BananaHub load FAIL: " .. tostring(err))
+    end
+    return ok
 end
 
 -- ==========================================
@@ -296,32 +330,19 @@ local function GetFragments()
     return val
 end
 
-local function RunFarmFragment()
-    repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
-    getgenv().Key    = "1f34f32b6f1917a66d57e8c6"
-    getgenv().NewUI  = true
-    getgenv().Config = {
-        ["Select Method Farm"] = "Farm Katakuri",
-        ["Hop Find Katakuri"]  = true,
-        ["Start Farm"]         = true,
-    }
-    local ok, err = pcall(function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/obiiyeuem/vthangsitink/main/BananaHub.lua"))()
-    end)
-    if ok then
-        warn("[DracoAuto] [3.05] BananaHub FarmFragment load thành công!")
-    else
-        warn("[DracoAuto] [3.05] BananaHub FarmFragment load thất bại: " .. tostring(err))
-    end
-end
-
 do
     local frag = GetFragments()
 
     if frag < FRAGMENT_MIN then
         ActionStatus.Text = "Hành động: [3.05] Fragment thiếu (" .. frag .. "/" .. FRAGMENT_MIN .. "), bắt đầu farm Katakuri..."
         warn("[DracoAuto] [3.05] Fragment = " .. frag .. " < " .. FRAGMENT_MIN .. " → Chạy FarmFragment!")
-        RunFarmFragment()
+
+        LoadBananaHub({
+            ["Select Method Farm"] = "Farm Katakuri",
+            ["Hop Find Katakuri"]  = true,
+            ["Start Farm"]         = true,
+        })
+
         repeat
             task.wait(3)
             frag = GetFragments()
@@ -437,17 +458,13 @@ do
                 task.wait(0.5)
             else
                 ActionStatus.Text = "Hành động: [3.1-A] Dragon Scale thiếu (" .. scaleCount .. "/5) → Farm..."
-                repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
-                getgenv().Key    = "1f34f32b6f1917a66d57e8c6"
-                getgenv().NewUI  = true
-                getgenv().Config = {
+
+                LoadBananaHub({
                     ["Select Material"] = "Dragon Scale",
                     ["Farm Material"]   = true,
                     ["Start Farm"]      = true,
-                }
-                pcall(function()
-                    loadstring(game:HttpGet("https://raw.githubusercontent.com/obiiyeuem/vthangsitink/main/BananaHub.lua"))()
-                end)
+                })
+
                 local lastScaleCount = scaleCount
                 repeat
                     task.wait(3)
@@ -473,13 +490,11 @@ do
                 task.wait(0.5)
             else
                 ActionStatus.Text = "Hành động: [3.1-B] Blaze Ember thiếu (" .. emberCount .. "/55) → Farm..."
-                repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
-                getgenv().Key    = "1f34f32b6f1917a66d57e8c6"
-                getgenv().NewUI  = true
-                getgenv().Config = { ["Auto Quest Dragon Hunter"] = true }
-                pcall(function()
-                    loadstring(game:HttpGet("https://raw.githubusercontent.com/obiiyeuem/vthangsitink/main/BananaHub.lua"))()
-                end)
+
+                LoadBananaHub({
+                    ["Auto Quest Dragon Hunter"] = true,
+                })
+
                 local lastEmberCount = emberCount
                 repeat
                     task.wait(3)
@@ -665,21 +680,6 @@ end
 
 -- ==========================================
 -- [ 3.4 ] FARM MASTERY DRAGONHEART & DRAGONSTORM
--- Tham khảo từ Draco Hub V1 (DoStatForMastery, ResetStat, AddStatPoint)
---
--- Luồng 1: Heart mastery < 500
---   → Check stat → cần Melee/Defense/Sword (2800 mỗi cái)
---   → Nếu sai → delay 5s → reset → nâng đúng build
---   → delay 4s → load BananaHub farm Sword
---   → loop check mỗi 10s → đủ 500 → kick
---
--- Luồng 2: Heart >= 500, Storm mastery < 500
---   → Check stat → cần Melee/Defense/Gun (2800 mỗi cái)
---   → Nếu sai → delay 5s → reset → nâng đúng build
---   → delay 4s → load BananaHub farm Gun
---   → loop check mỗi 10s → đủ 500
---   → ghi file PlayerName.txt = "Completed-mastery"
---   → delay 10s → kick
 -- ==========================================
 
 do
@@ -687,7 +687,6 @@ do
     local MASTERY_MAX = 500
     local CommF       = game:GetService("ReplicatedStorage").Remotes.CommF_
 
-    -- Reset stat (tham khảo từ Draco Hub V1 - BlackbeardReward Refund)
     local function ResetStat()
         ActionStatus.Text = "Hành động: [3.4] Đang reset stat..."
         warn("[DracoAuto] [3.4] ResetStat: Bắt đầu refund...")
@@ -698,7 +697,6 @@ do
         warn("[DracoAuto] [3.4] ResetStat: Hoàn tất!")
     end
 
-    -- Add stat point (tham khảo từ Draco Hub V1)
     local function AddStatPoint(statName, amount)
         pcall(function()
             CommF:InvokeServer("AddPoint", statName, amount)
@@ -706,9 +704,6 @@ do
         warn("[DracoAuto] [3.4] AddStatPoint: " .. statName .. " +" .. amount)
     end
 
-    -- Kiểm tra stat có đúng build chưa
-    -- "Sword" → cần Melee >= 2800, Defense >= 2800, Sword >= 2800
-    -- "Gun"   → cần Melee >= 2800, Defense >= 2800, Gun >= 2800
     local function IsStatCorrect(buildType)
         local s = getStats()
         if buildType == "Sword" then
@@ -719,14 +714,12 @@ do
         return false
     end
 
-    -- Equip cả hai vũ khí trước khi farm mastery
     ActionStatus.Text = "Hành động: [3.4] Đang equip Dragonheart & Dragonstorm..."
     EquipWeapon("Dragonheart")
     task.wait(0.5)
     EquipWeapon("Dragonstorm")
     task.wait(0.5)
 
-    -- Đọc mastery hiện tại
     local heartMastery = GetWeaponMastery("Dragonheart")
     local stormMastery = GetWeaponMastery("Dragonstorm")
 
@@ -740,13 +733,11 @@ do
         warn("[DracoAuto] [3.4-L1] Heart mastery " .. heartMastery .. " < 500 → Farm Sword mastery!")
         ActionStatus.Text = "Hành động: [3.4-L1] Heart mastery " .. heartMastery .. "/500 → Kiểm tra stat Sword build..."
 
-        -- Check stat có đúng Melee/Defense/Sword chưa
         if IsStatCorrect("Sword") then
             ActionStatus.Text = "Hành động: [3.4-L1] ✅ Stat đã đúng Sword build, giữ nguyên!"
             warn("[DracoAuto] [3.4-L1] Stat đã đúng Melee/Defense/Sword → giữ nguyên!")
             task.wait(1)
         else
-            -- Stat sai → delay 5s countdown → reset → nâng Melee/Defense/Sword
             warn("[DracoAuto] [3.4-L1] Stat sai → delay 5s rồi reset!")
             for i = 5, 1, -1 do
                 ActionStatus.Text = "Hành động: [3.4-L1] Stat chưa đúng! Reset sau " .. i .. "s..."
@@ -772,31 +763,18 @@ do
             warn("[DracoAuto] [3.4-L1] Xong reset + nâng Melee/Defense/Sword = " .. STAT_MAX)
         end
 
-        -- Delay 4 giây rồi load BananaHub farm Sword mastery (LUỒNG 1)
         ActionStatus.Text = "Hành động: [3.4-L1] Load farm Sword mastery sau 4s..."
         task.wait(4)
 
         warn("[DracoAuto] [3.4-L1] Load BananaHub HeartMastery...")
         ActionStatus.Text = "Hành động: [3.4-L1] Đang load BananaHub farm Heart (Sword) mastery..."
 
-        repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
-        getgenv().Key    = "1f34f32b6f1917a66d57e8c6"
-        getgenv().NewUI  = true
-        getgenv().Config = {
+        LoadBananaHub({
             ["Select Weapon"]      = "Sword",
             ["Select Method Farm"] = "Farm Bones",
             ["Start Farm"]         = true,
-        }
-        local okH, errH = pcall(function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/obiiyeuem/vthangsitink/main/BananaHub.lua"))()
-        end)
-        if okH then
-            warn("[DracoAuto] [3.4-L1] BananaHub HeartMastery load thành công!")
-        else
-            warn("[DracoAuto] [3.4-L1] BananaHub HeartMastery load thất bại: " .. tostring(errH))
-        end
+        })
 
-        -- Loop check mastery mỗi 10 giây (LUỒNG 1)
         repeat
             task.wait(10)
             heartMastery = GetWeaponMastery("Dragonheart")
@@ -808,7 +786,6 @@ do
             warn("[DracoAuto] [3.4-L1] Heart mastery: " .. heartMastery)
         until heartMastery >= MASTERY_MAX
 
-        -- Heart đủ 500 → kick để rejoin farm Storm
         ActionStatus.Text = "Hành động: [3.4-L1] ✅ Heart mastery đạt " .. heartMastery .. "/500! Kick..."
         warn("[DracoAuto] [3.4-L1] Heart mastery đủ 500 → Kick!")
         task.wait(2)
@@ -820,12 +797,10 @@ do
     else
         warn("[DracoAuto] [3.4-L2] Heart mastery " .. heartMastery .. " >= 500 → Check Storm!")
 
-        -- Re-read storm mastery sau khi equip
         stormMastery = GetWeaponMastery("Dragonstorm")
         MasteryLabel.Text = string.format("Mastery: Heart %d/500 | Storm %d/500", heartMastery, stormMastery)
 
         if stormMastery >= MASTERY_MAX then
-            -- Cả hai đều đã đủ 500 → ghi file + delay 10s + kick
             ActionStatus.Text = "Hành động: [3.4-L2] ✅ Cả Heart + Storm đều đủ 500!"
             warn("[DracoAuto] [3.4-L2] Cả hai đã đủ mastery → Ghi file + kick!")
 
@@ -839,17 +814,14 @@ do
             Player:Kick("\n[ Draco Auto ]\n✅ HOÀN THÀNH!\nHeart: " .. heartMastery .. "/500 | Storm: " .. stormMastery .. "/500\nFile " .. Player.Name .. ".txt đã ghi.")
 
         else
-            -- Storm < 500 → farm Gun mastery
             warn("[DracoAuto] [3.4-L2] Storm mastery " .. stormMastery .. " < 500 → Farm Gun mastery!")
             ActionStatus.Text = "Hành động: [3.4-L2] Storm mastery " .. stormMastery .. "/500 → Kiểm tra stat Gun build..."
 
-            -- Check stat có đúng Melee/Defense/Gun chưa
             if IsStatCorrect("Gun") then
                 ActionStatus.Text = "Hành động: [3.4-L2] ✅ Stat đã đúng Gun build, giữ nguyên!"
                 warn("[DracoAuto] [3.4-L2] Stat đã đúng Melee/Defense/Gun → giữ nguyên!")
                 task.wait(1)
             else
-                -- Stat sai → delay 5s countdown → reset → nâng Melee/Defense/Gun
                 warn("[DracoAuto] [3.4-L2] Stat sai → delay 5s rồi reset!")
                 for i = 5, 1, -1 do
                     ActionStatus.Text = "Hành động: [3.4-L2] Stat chưa đúng! Reset sau " .. i .. "s..."
@@ -875,34 +847,21 @@ do
                 warn("[DracoAuto] [3.4-L2] Xong reset + nâng Melee/Defense/Gun = " .. STAT_MAX)
             end
 
-            -- Delay 4 giây rồi load BananaHub farm Gun mastery (LUỒNG 2)
             ActionStatus.Text = "Hành động: [3.4-L2] Load farm Storm (Gun) mastery sau 4s..."
             task.wait(4)
 
             warn("[DracoAuto] [3.4-L2] Load BananaHub StormMastery...")
             ActionStatus.Text = "Hành động: [3.4-L2] Đang load BananaHub farm Storm (Gun) mastery..."
 
-            repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
-            getgenv().Key    = "1f34f32b6f1917a66d57e8c6"
-            getgenv().NewUI  = true
-            getgenv().Config = {
+            LoadBananaHub({
                 ["Select Weapon"]              = "Melee",
                 ["Select Method Farm"]         = "Farm Bones",
                 ["Select Method Farm Mastery"] = "Gun",
                 ["Health %"]                   = "45",
                 ["Farm Mastery"]               = true,
                 ["Start Farm"]                 = true,
-            }
-            local okS, errS = pcall(function()
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/obiiyeuem/vthangsitink/main/BananaHub.lua"))()
-            end)
-            if okS then
-                warn("[DracoAuto] [3.4-L2] BananaHub StormMastery load thành công!")
-            else
-                warn("[DracoAuto] [3.4-L2] BananaHub StormMastery load thất bại: " .. tostring(errS))
-            end
+            })
 
-            -- Loop check mastery mỗi 10 giây (LUỒNG 2)
             repeat
                 task.wait(10)
                 stormMastery = GetWeaponMastery("Dragonstorm")
@@ -914,7 +873,6 @@ do
                 warn("[DracoAuto] [3.4-L2] Storm mastery: " .. stormMastery)
             until stormMastery >= MASTERY_MAX
 
-            -- Storm đủ 500 → ghi file Completed-mastery → delay 10s → kick
             ActionStatus.Text = "Hành động: [3.4-L2] ✅ Storm mastery đạt " .. stormMastery .. "/500! Ghi file..."
             warn("[DracoAuto] [3.4-L2] Storm mastery đủ 500 → Ghi file!")
 
