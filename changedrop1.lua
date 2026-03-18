@@ -1,12 +1,12 @@
 -- ==========================================
--- SCRIPT CHECK DOJO BELT (GREEN) - BY GEMINI
+-- SCRIPT CHECK DOJO BELT (GREEN) - BY GEMINI (FIXED)
+-- Fix: Check 3 nơi (Character + Backpack + Inventory)
 -- ==========================================
 local Player = game.Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
--- Chờ Remote tồn tại
 local CommF = ReplicatedStorage:WaitForChild("Remotes", 30):WaitForChild("CommF_", 30)
--- Tạo UI nhỏ ở góc màn hình để theo dõi trạng thái
+
 local function CreateMiniUI()
     local SafeGuiParent = pcall(function() return gethui() end) and gethui() 
         or CoreGui:FindFirstChild("RobloxGui") or CoreGui
@@ -39,50 +39,55 @@ local function CreateMiniUI()
     return StatusText, MainFrame, Stroke
 end
 local StatusLabel, MainFrame, Stroke = CreateMiniUI()
+
+local function MarkFound(source)
+    local fileName = Player.Name .. ".txt"
+    pcall(function() writefile(fileName, "Completed-drop") end)
+    StatusLabel.Text = "✅ ĐÃ CÓ GREEN BELT! (" .. source .. ")"
+    StatusLabel.TextColor3 = Color3.fromRGB(80, 255, 80)
+    Stroke.Color = Color3.fromRGB(80, 255, 80)
+    warn("[DracoHub] Da tim thay Dojo Belt (Green) trong " .. source .. "! Ghi file: " .. fileName)
+    return true
+end
+
 local function CheckGreenBeltAndSave()
+    -- CHECK 1: Character (đang equip trên người)
+    local chr = Player.Character
+    if chr and chr:FindFirstChild("Dojo Belt (Green)") then
+        return MarkFound("Character")
+    end
+
+    -- CHECK 2: Backpack (trong túi đồ)
+    local bp = Player:FindFirstChild("Backpack")
+    if bp and bp:FindFirstChild("Dojo Belt (Green)") then
+        return MarkFound("Backpack")
+    end
+
+    -- CHECK 3: Inventory remote (kho đồ server)
     if not CommF then
         StatusLabel.Text = "⏳ Đợi Remote (CommF_)..."
         return false
     end
+
     local ok, inv = pcall(function()
         return CommF:InvokeServer("getInventory")
     end)
     if ok and type(inv) == "table" then
         StatusLabel.Text = "🔍 Đang quét Inventory (15s)..."
-        
-        local hasGreenBelt = false
         for _, item in pairs(inv) do
-            if type(item) == "table" then
-                if item.Name == "Dojo Belt (Green)" then
-                    hasGreenBelt = true
-                    break
-                end
+            if type(item) == "table" and item.Name == "Dojo Belt (Green)" then
+                return MarkFound("Inventory")
             end
         end
-        if hasGreenBelt then
-            local fileName = Player.Name .. ".txt"
-            local content = "Completed-drop"
-            
-            pcall(function()
-                writefile(fileName, content)
-            end)
-            
-            StatusLabel.Text = "✅ ĐÃ CÓ GREEN BELT!"
-            StatusLabel.TextColor3 = Color3.fromRGB(80, 255, 80)
-            Stroke.Color = Color3.fromRGB(80, 255, 80)
-            
-            warn("[DracoHub] Da tim thay Dojo Belt (Green)! Ghi file: " .. fileName)
-            return true 
-        else
-            StatusLabel.Text = "❌ CHƯA CÓ GREEN BELT"
-            StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-        end
+        StatusLabel.Text = "❌ CHƯA CÓ GREEN BELT"
+        StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
     else
         StatusLabel.Text = "⚠️ Lỗi Inventory, đang thử lại..."
         StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
     end
     return false
 end
+
 task.spawn(function()
     if not game:IsLoaded() then game.Loaded:Wait() end
     warn("[DracoHub] Bat dau vong lap check 15s cho Green Belt.")
