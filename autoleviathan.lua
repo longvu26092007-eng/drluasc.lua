@@ -272,14 +272,14 @@ task.spawn(function()
         local function GetOwnerInServer()
             for _, p in ipairs(services.Players:GetPlayers()) do
                 local name = p.Name:lower()
-                if name == "AshleyCraig7734" or name == "AnnaSolis7667" or name == "ArthurMills71535" or name == "BearCraftHyper200292" then 
+                if name == "ashleycraig7734" or name == "annasolis7667" or name == "arthurmills71535" or name == "bearcrafthyper200292" then 
                     return p.Name 
                 end
             end
             return nil
         end
 
-        if Player.Name:lower() ~= "AshleyCraig7734" and Player.Name:lower() ~= "AnnaSolis7667" and Player.Name:lower() ~= "ArthurMills71535" and Player.Name:lower() ~= "BearCraftHyper200292" then
+        if Player.Name:lower() ~= "ashleycraig7734" and Player.Name:lower() ~= "annasolis7667" and Player.Name:lower() ~= "arthurmills71535" and Player.Name:lower() ~= "bearcrafthyper200292" then
             -- ========================================
             -- ACC KHÁCH: Quét owner → load script
             -- ========================================
