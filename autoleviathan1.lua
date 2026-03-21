@@ -272,14 +272,14 @@ task.spawn(function()
         local function GetOwnerInServer()
             for _, p in ipairs(services.Players:GetPlayers()) do
                 local name = p.Name:lower()
-                if name == "nlvrblx" or name == "nhkyqqox" or name == "minkawai2007" or name == "hatraminn3" then 
+                if name == "AshleyCraig7734" or name == "AnnaSolis7667" or name == "ArthurMills71535" or name == "BearCraftHyper200292" then 
                     return p.Name 
                 end
             end
             return nil
         end
 
-        if Player.Name:lower() ~= "nlvrblx" and Player.Name:lower() ~= "minkawai2007" and Player.Name:lower() ~= "nhkyqqox" and Player.Name:lower() ~= "hatraminn3" then
+        if Player.Name:lower() ~= "AshleyCraig7734" and Player.Name:lower() ~= "AnnaSolis7667" and Player.Name:lower() ~= "ArthurMills71535" and Player.Name:lower() ~= "BearCraftHyper200292" then
             -- ========================================
             -- ACC KHÁCH: Quét owner → load script
             -- ========================================
@@ -321,7 +321,7 @@ task.spawn(function()
                 -- ========================================
                 task.spawn(function()
                     warn("[Levi] Bắt đầu check Leviathan Heart...")
-                    while task.wait(5) do
+                    while task.wait(1) do
                         local heartCount = 0
                         pcall(function()
                             local inv = services.CommF:InvokeServer("getInventory")
