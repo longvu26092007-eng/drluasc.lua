@@ -1,13 +1,20 @@
 -- ==========================================
--- SCRIPT CHECK DOJO BELT (YELLOW) - FIXED TIMEOUT
+-- SCRIPT CHECK DOJO BELT (YELLOW)
+-- Đợi game load xong rồi mới khởi tạo check
 -- ==========================================
+
+-- ══ ĐỢI GAME LOAD XONG TRƯỚC ══
+repeat task.wait() until game:IsLoaded()
+repeat task.wait() until game.Players.LocalPlayer
+repeat task.wait() until game.Players.LocalPlayer.Character
+    and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
 local Player = game.Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CommF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
 
-local CommF = ReplicatedStorage:WaitForChild("Remotes", 30):WaitForChild("CommF_", 30)
-
--- UI
+-- ══ TẠO UI SAU KHI GAME ĐÃ LOAD ══
 local function CreateMiniUI()
     local SafeGuiParent = pcall(function() return gethui() end) and gethui()
         or CoreGui:FindFirstChild("RobloxGui") or CoreGui
@@ -35,7 +42,7 @@ local function CreateMiniUI()
     StatusText.Name = "StatusLabel"
     StatusText.Size = UDim2.new(1, 0, 1, 0)
     StatusText.BackgroundTransparency = 1
-    StatusText.Text = "🔍 Khởi tạo Check Yellow..."
+    StatusText.Text = "🔍 Đang check Yellow Belt..."
     StatusText.TextColor3 = Color3.fromRGB(255, 255, 255)
     StatusText.Font = Enum.Font.GothamBold
     StatusText.TextSize = 12
@@ -46,6 +53,7 @@ end
 
 local StatusLabel, MainFrame, Stroke = CreateMiniUI()
 
+-- ══ MARK FOUND ══
 local function MarkFound(source)
     local fileName = Player.Name .. ".txt"
     pcall(function() writefile(fileName, "Completed-trade") end)
@@ -56,11 +64,10 @@ local function MarkFound(source)
     return true
 end
 
--- InvokeServer có timeout - tránh đứng đơ
+-- ══ INVOKE VỚI TIMEOUT ══
 local function InvokeWithTimeout(remote, timeout, ...)
-    local result = nil
-    local done   = false
-    local args   = {...}
+    local result, done = nil, false
+    local args = {...}
 
     task.spawn(function()
         local ok, res = pcall(function()
@@ -83,7 +90,8 @@ local function InvokeWithTimeout(remote, timeout, ...)
     return result
 end
 
-local function CheckYellowBeltAndSave()
+-- ══ CHECK LOGIC ══
+local function CheckYellowBelt()
     -- CHECK 1: Character
     local chr = Player.Character
     if chr and chr:FindFirstChild("Dojo Belt (Yellow)") then
@@ -96,12 +104,7 @@ local function CheckYellowBeltAndSave()
         return MarkFound("Backpack")
     end
 
-    -- CHECK 3: Inventory với timeout 8 giây
-    if not CommF then
-        StatusLabel.Text = "⏳ Đợi Remote (CommF_)..."
-        return false
-    end
-
+    -- CHECK 3: Inventory timeout 8s
     StatusLabel.Text = "🔍 Đang quét Inventory..."
     StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 
@@ -116,30 +119,29 @@ local function CheckYellowBeltAndSave()
         StatusLabel.Text = "❌ CHƯA CÓ YELLOW BELT"
         StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
     else
-        -- Timeout hoặc lỗi → không đứng đơ, tiếp tục loop
-        StatusLabel.Text = "⚠️ Timeout/Lỗi Inventory, thử lại..."
+        StatusLabel.Text = "⚠️ Timeout Inventory, thử lại..."
         StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-        warn("[YellowBelt] getInventory timeout hoặc lỗi, thử lại sau 15s")
+        warn("[YellowBelt] Timeout getInventory, thử lại sau 15s")
     end
 
     return false
 end
 
-task.spawn(function()
-    if not game:IsLoaded() then game.Loaded:Wait() end
-    warn("[YellowBelt] Bắt đầu vòng lặp check 15s.")
+-- ══ MAIN LOOP ══
+warn("[YellowBelt] Game đã load — Bắt đầu check mỗi 15s.")
 
-    while true do
-        local success = CheckYellowBeltAndSave()
-        if success then
-            task.wait(5)
-            pcall(function()
-                if MainFrame and MainFrame.Parent then
-                    MainFrame.Parent:Destroy()
-                end
-            end)
-            break
-        end
-        task.wait(15)
+while true do
+    local ok, success = pcall(CheckYellowBelt)
+
+    if ok and success then
+        task.wait(5)
+        pcall(function()
+            if MainFrame and MainFrame.Parent then
+                MainFrame.Parent:Destroy()
+            end
+        end)
+        break
     end
-end)
+
+    task.wait(15)
+end
