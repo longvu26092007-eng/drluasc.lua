@@ -10,6 +10,40 @@
     ╚══════════════════════════════════════════════════════════════════╝
 --]]
 
+-- ══ 1. ĐỢI GAME LOAD ══
+repeat task.wait() until game:IsLoaded()
+repeat task.wait() until game.Players.LocalPlayer
+repeat task.wait() until game.Players.LocalPlayer:FindFirstChild("PlayerGui")
+
+-- ══ 2. JOIN TEAM ══
+do
+    local _plr = game.Players.LocalPlayer
+    local _vim = game:GetService("VirtualInputManager")
+    local _team = getgenv().Team or "Pirates"
+    if _plr.Team == nil then
+        repeat task.wait()
+            for _, v in pairs(_plr.PlayerGui:GetChildren()) do
+                if string.find(v.Name, "Main") then
+                    pcall(function()
+                        local btn = v.ChooseTeam.Container[_team].Frame.TextButton
+                        btn.Size = UDim2.new(0,10000,0,10000)
+                        btn.Position = UDim2.new(-4,0,-5,0)
+                        btn.BackgroundTransparency = 1
+                        task.wait(0.5)
+                        _vim:SendMouseButtonEvent(0,0,0,true,game,1); task.wait(0.05)
+                        _vim:SendMouseButtonEvent(0,0,0,false,game,1); task.wait(0.05)
+                    end)
+                end
+            end
+        until _plr.Team ~= nil and game:IsLoaded()
+        task.wait(2)
+    end
+end
+
+-- ══ 3. ĐỢI CHARACTER ══
+repeat task.wait() until game.Players.LocalPlayer.Character
+    and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
 getgenv().PreDetect = {
     Running = true,
     HopMaxPlayers = 5,       -- Max player server khi hop
@@ -123,7 +157,6 @@ UL("action", "🎯 Game đã load!")
 -- DETECT FUNCTIONS (Banana file 2 style)
 -- ==========================================
 
--- Cách 1: Check _WorldOrigin (đảo đã spawn trên biển chưa)
 local function IsIslandSpawned()
     local ok, r = pcall(function()
         return workspace._WorldOrigin.Locations:FindFirstChild("Prehistoric Island") ~= nil
@@ -131,7 +164,6 @@ local function IsIslandSpawned()
     return ok and r
 end
 
--- Cách 2: Check Map (đảo đã load model chưa)
 local function IsIslandLoaded()
     local ok, r = pcall(function()
         return workspace.Map:FindFirstChild("PrehistoricIsland") ~= nil
@@ -139,7 +171,6 @@ local function IsIslandLoaded()
     return ok and r
 end
 
--- Lấy vị trí đảo
 local function GetIslandPosition()
     local ok, pos = pcall(function()
         local loc = workspace._WorldOrigin.Locations:FindFirstChild("Prehistoric Island")
@@ -153,25 +184,17 @@ local function GetIslandPosition()
     return ok and pos or nil
 end
 
--- Detect trạng thái trial (Banana file 2 dòng 5794)
--- ProximityPrompt CÒN = trial CHƯA bắt đầu (cần nhấn E để kích hoạt)
--- ProximityPrompt MẤT = trial ĐÃ KÍCH HOẠT hoặc ĐÃ XONG
 local function GetTrialState()
     if not IsIslandLoaded() then return "no_island" end
     local ok, state = pcall(function()
         local island = workspace.Map.PrehistoricIsland
         if not island:FindFirstChild("Core") then return "no_core" end
         local core = island.Core
-
-        -- Check ActivationPrompt còn ProximityPrompt không
         if core:FindFirstChild("ActivationPrompt") then
             if core.ActivationPrompt:FindFirstChild("ProximityPrompt", true) then
-                return "not_activated" -- Chưa nhấn E, trial chưa bắt đầu
+                return "not_activated"
             end
         end
-
-        -- Nếu không còn ProximityPrompt → trial đã kích hoạt
-        -- Check xem Golem còn sống không
         local golemAlive = false
         for _, e in pairs(workspace.Enemies:GetChildren()) do
             if e.Name == "Lava Golem" and e:FindFirstChild("Humanoid") and e.Humanoid.Health > 0 then
@@ -179,8 +202,6 @@ local function GetTrialState()
             end
         end
         if golemAlive then return "fighting_golem" end
-
-        -- Check VolcanoRocks còn cần đập không
         local rocksGlowing = false
         if core:FindFirstChild("VolcanoRocks") then
             for _, rock in pairs(core.VolcanoRocks:GetChildren()) do
@@ -191,35 +212,26 @@ local function GetTrialState()
             end
         end
         if rocksGlowing then return "fixing_volcano" end
-
-        -- Check Dragon Eggs đã spawn chưa
         local hasEggs = false
         if core:FindFirstChild("SpawnedDragonEggs") then
             hasEggs = #core.SpawnedDragonEggs:GetChildren() > 0
         end
-
-        -- Check DinoBone trong workspace
         local hasBones = false
         for _, v in pairs(workspace:GetChildren()) do
             if v.Name == "DinoBone" then hasBones = true; break end
         end
-
-        if hasEggs or hasBones then return "completed_loot" end -- Trial xong, có loot
-
-        return "completed_empty" -- Trial xong, không còn loot
+        if hasEggs or hasBones then return "completed_loot" end
+        return "completed_empty"
     end)
     return ok and state or "error"
 end
 
--- Đếm player khác trên đảo Pre
 local function GetPlayersOnIsland()
     local islandPos = GetIslandPosition()
     if not islandPos then return {}, 0 end
-
     local myName = LocalPlayer.Name
     local range = getgenv().PreDetect.IslandRange
     local playersOnIsland = {}
-
     for _, player in pairs(Players:GetPlayers()) do
         if player.Name ~= myName and player.Character then
             local hrp = player.Character:FindFirstChild("HumanoidRootPart")
@@ -230,11 +242,9 @@ local function GetPlayersOnIsland()
             end
         end
     end
-
     return playersOnIsland, #playersOnIsland
 end
 
--- Đếm Bones trong workspace
 local function CountBones()
     local count = 0
     for _, v in pairs(workspace:GetChildren()) do
@@ -243,7 +253,6 @@ local function CountBones()
     return count
 end
 
--- Đếm Eggs trên đảo
 local function CountEggs()
     local ok, count = pcall(function()
         local island = workspace.Map:FindFirstChild("PrehistoricIsland")
@@ -255,7 +264,6 @@ local function CountEggs()
     return ok and count or 0
 end
 
--- Check Golem
 local function IsGolemAlive()
     for _, e in pairs(workspace.Enemies:GetChildren()) do
         if e.Name == "Lava Golem" and e:FindFirstChild("Humanoid") and e.Humanoid.Health > 0 then
@@ -349,7 +357,6 @@ task.spawn(function()
 
     while getgenv().PreDetect.Running do
         xpcall(function()
-            -- === DETECT ĐẢO ===
             local spawned = IsIslandSpawned()
             local loaded = IsIslandLoaded()
 
@@ -370,11 +377,9 @@ task.spawn(function()
                 return
             end
 
-            -- === DETECT TRIAL STATE ===
             local state = GetTrialState()
             UL("trial", "⚡ Trial: " .. (STATE_TEXT[state] or state))
 
-            -- === DETECT GOLEM ===
             local golemAlive, golemHP, golemMax = IsGolemAlive()
             if golemAlive then
                 local pct = golemMax > 0 and math.floor(golemHP / golemMax * 100) or 0
@@ -385,7 +390,6 @@ task.spawn(function()
                 SLC("golem", Color3.fromRGB(220, 220, 240))
             end
 
-            -- === DETECT BONES + EGGS ===
             local boneCount = CountBones()
             local eggCount = CountEggs()
             UL("bones", "🦴 Bones: " .. boneCount)
@@ -393,7 +397,6 @@ task.spawn(function()
             if boneCount > 0 then SLC("bones", Color3.fromRGB(80, 255, 80)) else SLC("bones", Color3.fromRGB(220, 220, 240)) end
             if eggCount > 0 then SLC("eggs", Color3.fromRGB(80, 255, 80)) else SLC("eggs", Color3.fromRGB(220, 220, 240)) end
 
-            -- === DETECT PLAYERS TRÊN ĐẢO ===
             local playerNames, playerCount = GetPlayersOnIsland()
             UL("players", "👥 Người trên đảo: " .. playerCount .. " (ngoài mình)")
 
@@ -409,12 +412,11 @@ task.spawn(function()
                 SLC("names", Color3.fromRGB(220, 220, 240))
             end
 
-            -- === HÀNH ĐỘNG: sau trial xong + có người khác → HOP ===
             if state == "completed_loot" or state == "completed_empty" then
                 if playerCount > 0 and getgenv().PreDetect.HopIfOthersOnIsland then
                     UL("action", "🔄 Trial xong + " .. playerCount .. " người khác → HOP!")
                     SLC("action", Color3.fromRGB(255, 200, 50))
-                    task.wait(2) -- Chờ 2s trước khi hop
+                    task.wait(2)
                     HopServer("Trial xong, " .. playerCount .. " người trên đảo")
                     task.wait(getgenv().PreDetect.HopWaitTime)
                     return
@@ -449,7 +451,6 @@ task.spawn(function()
     UL("action", "⛔ Đã dừng"); SLC("action", Color3.fromRGB(255, 80, 80))
 end)
 
--- Server info update
 task.spawn(function()
     while task.wait(10) do
         if not getgenv().PreDetect.Running then break end
