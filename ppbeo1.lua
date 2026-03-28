@@ -5,6 +5,7 @@
     ║  Fix: 7s timeout hop + Purple Belt inventory check               ║
     ╚══════════════════════════════════════════════════════════════════╝
 --]]
+
 -- ══ ĐỢI GAME LOAD XONG TRƯỚC ══
 repeat task.wait() until game:IsLoaded()
 repeat task.wait() until game.Players.LocalPlayer
@@ -263,18 +264,15 @@ local function HopServer(reason)
     end; AddLog("Không tìm server phù hợp") return false
 end
 
--- Belt detection
 local DOJO_POS = CFrame.new(5865.0234375, 1208.3154296875, 871.15185546875)
 local HYDRA_ENTRANCE = Vector3.new(5661.5322265625, 1013.0907592773438, -334.9649963378906)
 local function TeleportToHydra() pcall(function() COMMF_:InvokeServer("requestEntrance", HYDRA_ENTRANCE) end) end
 
--- Kiểm tra đang đứng gần Dojo Trainer (Banana style: Magnitude <= 50)
 local function IsNearDojo()
     if not HumanoidRootPart then return false end
     return (DOJO_POS.Position - HumanoidRootPart.Position).Magnitude <= 50
 end
 
--- Bay đến Dojo Trainer và chờ đến nơi (timeout 30s)
 local function EnsureNearDojo()
     if IsNearDojo() then return true end
     TeleportToHydra(); task.wait(1)
@@ -285,7 +283,6 @@ local function EnsureNearDojo()
     return IsNearDojo()
 end
 
--- CHỈ gọi RequestQuest khi đứng cạnh NPC (theo Banana file 2)
 local function GetCurrentBeltName()
     if not IsNearDojo() then
         if not EnsureNearDojo() then return nil, nil end
@@ -295,7 +292,6 @@ local function GetCurrentBeltName()
     return nil, progress
 end
 
--- CHỈ gọi ClaimQuest khi đứng cạnh NPC (theo Banana file 2: dòng 5812-5815)
 local function ClaimDojoQuest()
     if not IsNearDojo() then
         if not EnsureNearDojo() then AddLog("Không đến được Dojo → skip claim") return end
@@ -304,7 +300,6 @@ local function ClaimDojoQuest()
     pcall(function() local args = {[1] = {["NPC"]="Dojo Trainer",["Command"]="ClaimQuest"}}; ReplicatedStorage.Modules.Net:FindFirstChild("RF/InteractDragonQuest"):InvokeServer(unpack(args)) end)
 end
 
--- Nhận quest Elite Hunter (gọi cạnh Dojo luôn vì đang ở đó)
 local function AcceptEliteQuestAtDojo()
     if not IsNearDojo() then
         if not EnsureNearDojo() then AddLog("Không đến được Dojo → skip Elite quest") return end
@@ -321,7 +316,6 @@ local function GetQuestInfo()
 end
 local function GetEliteProgress() local ok, p = pcall(function() return COMMF_:InvokeServer("EliteHunter", "Progress") end); return ok and p or 0 end
 
--- File
 local function WriteCompletedFile(content)
     content = content or "Completed-ppbelt"
     pcall(function() if writefile then writefile(LocalPlayer.Name..".txt", content); AddLog("GHI FILE: "..LocalPlayer.Name..".txt → "..content) end end)
@@ -350,7 +344,6 @@ if AlreadyCompleted() then
     AddLog("File Completed-ppbelt đã tồn tại. Dừng."); return
 end
 
--- Hàm dừng toàn bộ khi đã có Purple Belt
 local function FinishPurpleBelt()
     UL("status","🎉 ĐÃ CÓ PURPLE BELT TRONG INVENTORY!")
     SLC("status", Color3.fromRGB(80, 255, 80))
@@ -365,102 +358,53 @@ task.spawn(function()
 
     while getgenv().PurpleBelt.Running do
         xpcall(function()
-            -- ĐẦU MỖI LOOP: check Purple Belt trong inventory
             if HasPurpleBelt() then FinishPurpleBelt(); return end
-
             if getgenv()._manualHop then getgenv()._manualHop = false; HopServer("Hop thủ công"); task.wait(getgenv().PurpleBelt.HopWaitTime); return end
-
             local isSea3 = CheckSea(3)
             UL("sea","🌊 Sea: "..(isSea3 and "3 ✅" or "❌"))
             if not isSea3 then UL("status","🌊 Teleport Sea 3..."); AddLog("→ Sea 3"); pcall(function() COMMF_:InvokeServer("TravelZou") end); task.wait(5); return end
-
             TeleportToHydra(); task.wait(1)
-
-            if not EnsureNearDojo() then
-                AddLog("Không bay được đến Dojo, thử lại..."); task.wait(3); return
-            end
-
-            -- Check inventory lần nữa sau khi đến Dojo
+            if not EnsureNearDojo() then AddLog("Không bay được đến Dojo, thử lại..."); task.wait(3); return end
             if HasPurpleBelt() then FinishPurpleBelt(); return end
-
             local beltName, progress = GetCurrentBeltName()
             UL("belt","🥋 Belt: "..(beltName or "N/A")); UL("progress","📊 Elite Killed: "..tostring(GetEliteProgress()))
-
-            -- Quest xong → claim (đang đứng cạnh Dojo)
             if not progress and not beltName then
                 UL("status","🔍 Đứng cạnh Dojo → Claim quest...")
                 ClaimDojoQuest(); task.wait(1)
-                -- Sau claim check inventory
                 if HasPurpleBelt() then FinishPurpleBelt(); return end
                 local bn2 = GetCurrentBeltName()
-                if not bn2 then
-                    AddLog("Claim xong, không có quest mới → check inventory lần nữa")
-                    task.wait(2)
-                    if HasPurpleBelt() then FinishPurpleBelt(); return end
-                end
+                if not bn2 then AddLog("Claim xong, không có quest mới → check inventory lần nữa"); task.wait(2); if HasPurpleBelt() then FinishPurpleBelt(); return end end
             end
-
-            -- Sai belt (không phải Purple)
             if beltName and beltName ~= "Purple" then
                 UL("status","⚠️ Belt: "..beltName.." (không phải Purple)"); AddLog("Belt: "..beltName)
-                -- Vẫn check inventory phòng trường hợp đã có từ trước
                 if HasPurpleBelt() then FinishPurpleBelt(); return end
                 task.wait(5); return
             end
-
-            -- =============================================
-            -- === PURPLE BELT + 7S TIMEOUT ===
-            -- =============================================
             if beltName == "Purple" then
                 UL("status","🟣 Purple Belt → Nhận quest Elite...")
-
-                -- Đứng cạnh Dojo → Claim quest cũ + Nhận quest Elite
-                ClaimDojoQuest()
-                task.wait(0.5)
-                AcceptEliteQuestAtDojo()
-
-                -- Chờ tối đa 7 giây
-                local gotEliteQuest = false
-                local waitStart = tick()
-
+                ClaimDojoQuest(); task.wait(0.5); AcceptEliteQuestAtDojo()
+                local gotEliteQuest = false; local waitStart = tick()
                 repeat
                     task.wait(0.5)
                     local elapsed = math.floor(tick() - waitStart)
                     UL("quest","📜 Chờ quest Elite ("..elapsed.."/7s)...")
-
                     local qi = GetQuestInfo()
-                    if qi.visible and qi.isElite then
-                        gotEliteQuest = true
-                        break
-                    end
-                    if qi.visible and not qi.isElite then
-                        AddLog("Quest khác (không Elite) → Hop")
-                        break
-                    end
+                    if qi.visible and qi.isElite then gotEliteQuest = true; break end
+                    if qi.visible and not qi.isElite then AddLog("Quest khác (không Elite) → Hop"); break end
                 until tick() - waitStart >= 7
-
                 local qi = GetQuestInfo()
                 UL("quest","📜 Quest: "..(qi.visible and qi.text or "Không có"))
-
                 if not gotEliteQuest then
-                    UL("status","🔄 7s timeout → Hop")
-                    UL("elite","👹 Elite Boss: KHÔNG CÓ ❌")
+                    UL("status","🔄 7s timeout → Hop"); UL("elite","👹 Elite Boss: KHÔNG CÓ ❌")
                     AddLog("7s không có quest Elite → Hop")
                     Tween(false); _noclipActive = false; RemoveBodyClip()
-                    HopServer("7s timeout - không có Elite")
-                    task.wait(getgenv().PurpleBelt.HopWaitTime)
-                    return
+                    HopServer("7s timeout - không có Elite"); task.wait(getgenv().PurpleBelt.HopWaitTime); return
                 end
-
-                -- CÓ quest Elite → tìm boss
                 local eName, eLoc = FindEliteBossName()
                 UL("elite","👹 Elite: "..(eName or "?").." ["..(eLoc or "?").."]")
-
                 if eName then
                     UL("status","⚔️ Đánh: "..eName); SLC("status",Color3.fromRGB(255,200,50))
-                    AddLog("Đánh Elite: "..eName)
-                    _noclipActive = true; EnsureBodyClip()
-
+                    AddLog("Đánh Elite: "..eName); _noclipActive = true; EnsureBodyClip()
                     local boss = CheckMonster(eName)
                     if boss then
                         repeat task.wait(0.1)
@@ -471,32 +415,20 @@ task.spawn(function()
                             end end)
                         until not boss or not boss.Parent or not boss:FindFirstChild("Humanoid") or boss.Humanoid.Health <= 0
                     end
-
                     Tween(false); _noclipActive = false; RemoveBodyClip()
-                    AddLog(eName.." đã chết!"); UL("elite","👹 "..eName.." ĐÃ CHẾT ✅")
-                    task.wait(2)
-
-                    -- Sau khi đánh xong → check inventory
+                    AddLog(eName.." đã chết!"); UL("elite","👹 "..eName.." ĐÃ CHẾT ✅"); task.wait(2)
                     if HasPurpleBelt() then FinishPurpleBelt(); return end
-
-                    -- Bay về Dojo claim
                     AddLog("Đánh xong → Bay về Dojo claim...")
-                    if EnsureNearDojo() then
-                        ClaimDojoQuest(); task.wait(1)
-                        if HasPurpleBelt() then FinishPurpleBelt(); return end
-                    end
+                    if EnsureNearDojo() then ClaimDojoQuest(); task.wait(1); if HasPurpleBelt() then FinishPurpleBelt(); return end end
                 else
-                    UL("status","🔄 Boss không thấy → Hop")
-                    AddLog("Boss không spawn → Hop")
+                    UL("status","🔄 Boss không thấy → Hop"); AddLog("Boss không spawn → Hop")
                     Tween(false); _noclipActive = false; RemoveBodyClip()
                     HopServer("Boss không spawn"); task.wait(getgenv().PurpleBelt.HopWaitTime); return
                 end
             end
-
         end, function(err) warn("[PurpleBelt] ERROR:", err); AddLog("Lỗi: "..string.sub(tostring(err),1,50)) end)
         task.wait(0.5)
     end
-
     UL("status","⛔ Script đã dừng"); _noclipActive = false; RemoveBodyClip(); Tween(false)
 end)
 
