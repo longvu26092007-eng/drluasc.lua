@@ -5,6 +5,11 @@
     ║  Fix: 7s timeout hop + Purple Belt inventory check               ║
     ╚══════════════════════════════════════════════════════════════════╝
 --]]
+-- ══ ĐỢI GAME LOAD XONG TRƯỚC ══
+repeat task.wait() until game:IsLoaded()
+repeat task.wait() until game.Players.LocalPlayer
+repeat task.wait() until game.Players.LocalPlayer.Character
+    and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 
 getgenv().PurpleBelt = {
     Running = true,
