@@ -6,9 +6,36 @@
     ╚══════════════════════════════════════════════════════════════════╝
 --]]
 
--- ══ ĐỢI GAME LOAD XONG TRƯỚC ══
+-- ══ 1. ĐỢI GAME LOAD ══
 repeat task.wait() until game:IsLoaded()
 repeat task.wait() until game.Players.LocalPlayer
+repeat task.wait() until game.Players.LocalPlayer:FindFirstChild("PlayerGui")
+
+-- ══ 2. JOIN TEAM ══
+do
+    local _plr = game.Players.LocalPlayer
+    local _vim = game:GetService("VirtualInputManager")
+    if _plr.Team == nil then
+        repeat task.wait()
+            for _, v in pairs(_plr.PlayerGui:GetChildren()) do
+                if string.find(v.Name, "Main") then
+                    pcall(function()
+                        local btn = v.ChooseTeam.Container[getgenv().PurpleBelt and getgenv().PurpleBelt.Team or "Pirates"].Frame.TextButton
+                        btn.Size = UDim2.new(0,10000,0,10000)
+                        btn.Position = UDim2.new(-4,0,-5,0)
+                        btn.BackgroundTransparency = 1
+                        task.wait(0.5)
+                        _vim:SendMouseButtonEvent(0,0,0,true,game,1); task.wait(0.05)
+                        _vim:SendMouseButtonEvent(0,0,0,false,game,1); task.wait(0.05)
+                    end)
+                end
+            end
+        until _plr.Team ~= nil and game:IsLoaded()
+        task.wait(2)
+    end
+end
+
+-- ══ 3. ĐỢI CHARACTER ══
 repeat task.wait() until game.Players.LocalPlayer.Character
     and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 
@@ -137,15 +164,6 @@ UL("status","⏳ Đang chờ game load...")
 if not game:IsLoaded() or workspace.DistributedGameTime <= 10 then task.wait(10 - workspace.DistributedGameTime) end
 local COMMF_ = ReplicatedStorage:WaitForChild("Remotes") and ReplicatedStorage.Remotes:WaitForChild("CommF_")
 if not COMMF_ then repeat task.wait(1) until COMMF_ end
-
-task.spawn(function() xpcall(function()
-    if not LocalPlayer.Team then
-        if LocalPlayer.PlayerGui:FindFirstChild("LoadingScreen") then repeat task.wait(1) until not LocalPlayer.PlayerGui:FindFirstChild("LoadingScreen") end
-        xpcall(function() COMMF_:InvokeServer("SetTeam", getgenv().PurpleBelt.Team)
-        end, function() pcall(function() firesignal(LocalPlayer.PlayerGui["Main (minimal)"].ChooseTeam.Container[getgenv().PurpleBelt.Team]) end) end)
-        task.wait(2); AddLog("Join team: "..getgenv().PurpleBelt.Team)
-    end
-end, function() end) end)
 
 repeat task.wait(2) until Character and Character:FindFirstChild("HumanoidRootPart") and Character:FindFirstChildWhichIsA("Humanoid") and Character:IsDescendantOf(workspace.Characters)
 UL("status","✅ Game đã load!")
