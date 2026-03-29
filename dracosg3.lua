@@ -145,6 +145,7 @@ end
 
 -- ==========================================
 -- [ PHẦN 1.3 ] HỆ THỐNG ATTACK
+-- Đã fix: Sát thương đa mục tiêu (Array)
 -- ==========================================
 local COMMF_ = ReplicatedStorage:WaitForChild("Remotes") and ReplicatedStorage.Remotes:WaitForChild("CommF_")
 local remoteAttack, idremote
@@ -166,36 +167,53 @@ task.spawn(function()
 end)
 
 local lastCallFA = tick()
-local function FastAttack(x)
+local function FastAttack(validNames)
     if not HumanoidRootPart or not Character or not Character:FindFirstChildWhichIsA("Humanoid") or Character.Humanoid.Health <= 0 then return end
     local FAD = 0.01
     if FAD ~= 0 and tick() - lastCallFA <= FAD then return end
+    
     local t = {}
     for _, e in next, workspace.Enemies:GetChildren() do
         local h = e:FindFirstChild("Humanoid")
         local hrp = e:FindFirstChild("HumanoidRootPart")
-        if e ~= Character and (x and e.Name == x or not x) and h and hrp and h.Health > 0 and (hrp.Position - HumanoidRootPart.Position).Magnitude <= 65 then
-            t[#t + 1] = e
+        if e ~= Character and h and hrp and h.Health > 0 and (hrp.Position - HumanoidRootPart.Position).Magnitude <= 65 then
+            -- Kiểm tra xem tên quái có nằm trong danh sách cần farm không
+            local isValid = false
+            if type(validNames) == "table" then
+                for _, n in ipairs(validNames) do
+                    if e.Name == n then isValid = true; break end
+                end
+            elseif type(validNames) == "string" then
+                isValid = (e.Name == validNames)
+            elseif validNames == nil then
+                isValid = true
+            end
+
+            if isValid then
+                t[#t + 1] = e
+            end
         end
     end
-    local n = ReplicatedStorage.Modules.Net
-    local h = {[2] = {}}
-    local last
-    for i = 1, #t do
-        local v = t[i]
-        local part = v:FindFirstChild("Head") or v:FindFirstChild("HumanoidRootPart")
-        if not h[1] then h[1] = part end
-        h[2][#h[2] + 1] = {v, part}
-        last = v
+    
+    if #t > 0 then
+        local n = ReplicatedStorage.Modules.Net
+        local h = {[2] = {}}
+        local last
+        for i = 1, #t do
+            local v = t[i]
+            local part = v:FindFirstChild("Head") or v:FindFirstChild("HumanoidRootPart")
+            if not h[1] then h[1] = part end
+            h[2][#h[2] + 1] = {v, part}
+            last = v
+        end
+        n:FindFirstChild("RE/RegisterAttack"):FireServer()
+        n:FindFirstChild("RE/RegisterHit"):FireServer(unpack(h))
+        
+        local attackRemote = typeof(cloneref) == "function" and cloneref(remoteAttack) or remoteAttack
+        attackRemote:FireServer(string.gsub("RE/RegisterHit", ".", function(c)
+            return string.char(bit32.bxor(string.byte(c), math.floor(workspace:GetServerTimeNow() / 10 % 10) + 1))
+        end), bit32.bxor(idremote + 909090, seed * 2), unpack(h))
     end
-    n:FindFirstChild("RE/RegisterAttack"):FireServer()
-    n:FindFirstChild("RE/RegisterHit"):FireServer(unpack(h))
-    
-    local attackRemote = typeof(cloneref) == "function" and cloneref(remoteAttack) or remoteAttack
-    attackRemote:FireServer(string.gsub("RE/RegisterHit", ".", function(c)
-        return string.char(bit32.bxor(string.byte(c), math.floor(workspace:GetServerTimeNow() / 10 % 10) + 1))
-    end), bit32.bxor(idremote + 909090, seed * 2), unpack(h))
-    
     lastCallFA = tick()
 end
 
@@ -245,9 +263,9 @@ end
 
 -- ==========================================
 -- HÀM ATTACK + BRING MOB (GOM QUÁI XỊN)
--- Đã fix: không xóa animator, tự lấy simulation radius
+-- Fix: Gom nhiều loại quái cùng lúc (Array)
 -- ==========================================
-local function SafeKillMob(targetModel)
+local function SafeKillMob(targetModel, validNamesList)
     xpcall(function()
         if not targetModel or not targetModel.Parent then return end
         local vh = targetModel:FindFirstChild("Humanoid")
@@ -264,23 +282,31 @@ local function SafeKillMob(targetModel)
             Player.SimulationRadius = math.huge
         end)
 
-        local targetName = targetModel.Name
         local centerCFrame = vhrp.CFrame
 
-        -- 2. HÚT QUÁI (Bring)
+        -- 2. HÚT QUÁI (Bring - Hỗ trợ Array Names)
         pcall(function()
             for _, enemy in pairs(workspace.Enemies:GetChildren()) do
                 local eh = enemy:FindFirstChild("Humanoid")
                 local ehrp = enemy:FindFirstChild("HumanoidRootPart")
-                if eh and eh.Health > 0 and ehrp and enemy.Name == targetName and enemy ~= targetModel then
-                    if (ehrp.Position - centerCFrame.Position).Magnitude <= 350 then
+                if eh and eh.Health > 0 and ehrp and enemy ~= targetModel then
+                    
+                    local isValid = false
+                    if type(validNamesList) == "table" then
+                        for _, n in ipairs(validNamesList) do
+                            if enemy.Name == n then isValid = true; break end
+                        end
+                    else
+                        isValid = (enemy.Name == targetModel.Name)
+                    end
+
+                    if isValid and (ehrp.Position - centerCFrame.Position).Magnitude <= 350 then
                         ehrp.CFrame = centerCFrame
                         ehrp.CanCollide = false
                         eh.WalkSpeed = 0
                         eh.JumpPower = 0
-                        eh:ChangeState(11) -- Stun (tránh nó tự di chuyển)
+                        eh:ChangeState(11) -- Stun
                         
-                        -- Xóa lực đẩy nếu có
                         if ehrp:FindFirstChild("BodyVelocity") then ehrp.BodyVelocity:Destroy() end
                     end
                 end
@@ -292,21 +318,19 @@ local function SafeKillMob(targetModel)
         local dz = hrp.Position.Z - centerCFrame.Position.Z
         local sqrMag = dx*dx + dy*dy + dz*dz
 
-        -- 3. Check tầm đánh & Tấn Công
+        -- 3. Check tầm đánh & Tấn Công (Truyền List vào FastAttack)
         if sqrMag <= 4900 then -- Bán kính 70 studs
             EquipWeaponTool("Melee")
-            FastAttack(targetName)
+            FastAttack(validNamesList or targetModel.Name)
 
             if tick() - lastKenCall >= 10 then
                 lastKenCall = tick()
                 pcall(function() ReplicatedStorage.Remotes.CommE:FireServer("Ken", true) end)
             end
 
-            -- Bay cao 20 studs & Chĩa mặt xuống quái
             local attackPos = CFrame.new(centerCFrame.Position + Vector3.new(0, 20, 0), centerCFrame.Position)
             SmoothTween(attackPos, 350)
         else
-            -- Lướt lại gần nếu còn xa
             local approachPos = CFrame.new(centerCFrame.Position + Vector3.new(0, 20, 0), centerCFrame.Position)
             SmoothTween(approachPos, 350)
         end
@@ -690,8 +714,9 @@ do
                         if target then
                             EnsureBuso()
                             repeat
-                                SafeKillMob(target)
-                                task.wait(0.15) -- Delay an toàn
+                                -- TRUYỀN CẢ BẢNG SCALE_MOBS VÀO ĐỂ GOM CẢ 2 LOẠI QUÁI
+                                SafeKillMob(target, SCALE_MOBS)
+                                task.wait(0.15) 
                             until not _farmingScale
                                 or not target or not target.Parent
                                 or not target:FindFirstChild("Humanoid")
@@ -820,7 +845,7 @@ do
                                     if target then
                                         EnsureBuso()
                                         repeat
-                                            SafeKillMob(target)
+                                            SafeKillMob(target, {mobName})
                                             task.wait(0.15)
                                         until not _farmingEmber
                                             or not target or not target.Parent
