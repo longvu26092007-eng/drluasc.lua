@@ -64,7 +64,6 @@ end)
 
 -- ==========================================
 -- [ 1.1 ] HỆ THỐNG DI CHUYỂN BÓNG (TWEEN)
--- Fix hoàn toàn lỗi giật tại chỗ
 -- ==========================================
 local _tweenGhost = nil
 local _tweenConn  = nil
@@ -144,8 +143,7 @@ local function TweenTo(targetCFrame, speed)
 end
 
 -- ==========================================
--- [ PHẦN 1.3 ] HỆ THỐNG ATTACK
--- Đã fix: Sát thương đa mục tiêu (Array)
+-- [ PHẦN 1.3 ] HỆ THỐNG ATTACK & BRING MOB (CHUẨN BANANA)
 -- ==========================================
 local COMMF_ = ReplicatedStorage:WaitForChild("Remotes") and ReplicatedStorage.Remotes:WaitForChild("CommF_")
 local remoteAttack, idremote
@@ -177,7 +175,6 @@ local function FastAttack(validNames)
         local h = e:FindFirstChild("Humanoid")
         local hrp = e:FindFirstChild("HumanoidRootPart")
         if e ~= Character and h and hrp and h.Health > 0 and (hrp.Position - HumanoidRootPart.Position).Magnitude <= 65 then
-            -- Kiểm tra xem tên quái có nằm trong danh sách cần farm không
             local isValid = false
             if type(validNames) == "table" then
                 for _, n in ipairs(validNames) do
@@ -252,6 +249,37 @@ local function FindClosestMob(mobNames)
     return closest
 end
 
+-- Bring Enemy chuẩn Banana Hub
+local function BringEnemy(centerPos, validNamesList)
+    pcall(function()
+        if setsimulationradius then setsimulationradius(math.huge, math.huge) end
+        Player.SimulationRadius = math.huge
+        for _, v in pairs(workspace.Enemies:GetChildren()) do
+            local eh = v:FindFirstChild("Humanoid")
+            local ehrp = v:FindFirstChild("HumanoidRootPart")
+            if eh and eh.Health > 0 and ehrp then
+                local isValid = false
+                if type(validNamesList) == "table" then
+                    for _, n in ipairs(validNamesList) do
+                        if v.Name == n then isValid = true; break end
+                    end
+                else
+                    isValid = (v.Name == validNamesList)
+                end
+
+                if isValid and (ehrp.Position - centerPos).Magnitude <= 350 then
+                    ehrp.CFrame = CFrame.new(centerPos)
+                    ehrp.CanCollide = false
+                    eh.WalkSpeed = 0
+                    eh.JumpPower = 0
+                    eh:ChangeState(11)
+                    if ehrp:FindFirstChild("BodyVelocity") then ehrp.BodyVelocity:Destroy() end
+                end
+            end
+        end
+    end)
+end
+
 local lastKenCall = tick()
 local function EnsureBuso()
     pcall(function()
@@ -259,82 +287,6 @@ local function EnsureBuso()
             COMMF_:InvokeServer("Buso")
         end
     end)
-end
-
--- ==========================================
--- HÀM ATTACK + BRING MOB (GOM QUÁI XỊN)
--- Fix: Gom nhiều loại quái cùng lúc (Array)
--- ==========================================
-local function SafeKillMob(targetModel, validNamesList)
-    xpcall(function()
-        if not targetModel or not targetModel.Parent then return end
-        local vh = targetModel:FindFirstChild("Humanoid")
-        local vhrp = targetModel:FindFirstChild("HumanoidRootPart")
-        if not vh or vh.Health <= 0 or not vhrp then return end
-
-        local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-
-        -- 1. Giành quyền vật lý (chống giật quái về chỗ cũ)
-        pcall(function()
-            if setsimulationradius then setsimulationradius(math.huge, math.huge) end
-            if sethiddenproperty then sethiddenproperty(Player, "SimulationRadius", math.huge) end
-            Player.SimulationRadius = math.huge
-        end)
-
-        local centerCFrame = vhrp.CFrame
-
-        -- 2. HÚT QUÁI (Bring - Hỗ trợ Array Names)
-        pcall(function()
-            for _, enemy in pairs(workspace.Enemies:GetChildren()) do
-                local eh = enemy:FindFirstChild("Humanoid")
-                local ehrp = enemy:FindFirstChild("HumanoidRootPart")
-                if eh and eh.Health > 0 and ehrp and enemy ~= targetModel then
-                    
-                    local isValid = false
-                    if type(validNamesList) == "table" then
-                        for _, n in ipairs(validNamesList) do
-                            if enemy.Name == n then isValid = true; break end
-                        end
-                    else
-                        isValid = (enemy.Name == targetModel.Name)
-                    end
-
-                    if isValid and (ehrp.Position - centerCFrame.Position).Magnitude <= 350 then
-                        ehrp.CFrame = centerCFrame
-                        ehrp.CanCollide = false
-                        eh.WalkSpeed = 0
-                        eh.JumpPower = 0
-                        eh:ChangeState(11) -- Stun
-                        
-                        if ehrp:FindFirstChild("BodyVelocity") then ehrp.BodyVelocity:Destroy() end
-                    end
-                end
-            end
-        end)
-
-        local dx = hrp.Position.X - centerCFrame.Position.X
-        local dy = hrp.Position.Y - centerCFrame.Position.Y
-        local dz = hrp.Position.Z - centerCFrame.Position.Z
-        local sqrMag = dx*dx + dy*dy + dz*dz
-
-        -- 3. Check tầm đánh & Tấn Công (Truyền List vào FastAttack)
-        if sqrMag <= 4900 then -- Bán kính 70 studs
-            EquipWeaponTool("Melee")
-            FastAttack(validNamesList or targetModel.Name)
-
-            if tick() - lastKenCall >= 10 then
-                lastKenCall = tick()
-                pcall(function() ReplicatedStorage.Remotes.CommE:FireServer("Ken", true) end)
-            end
-
-            local attackPos = CFrame.new(centerCFrame.Position + Vector3.new(0, 20, 0), centerCFrame.Position)
-            SmoothTween(attackPos, 350)
-        else
-            local approachPos = CFrame.new(centerCFrame.Position + Vector3.new(0, 20, 0), centerCFrame.Position)
-            SmoothTween(approachPos, 350)
-        end
-    end, function(e) warn("[DracoAuto] SafeKillMob ERROR:", e) end)
 end
 
 local VIM = game:GetService("VirtualInputManager")
@@ -713,19 +665,32 @@ do
                         local target = FindClosestMob(SCALE_MOBS)
                         if target then
                             EnsureBuso()
-                            repeat
-                                -- TRUYỀN CẢ BẢNG SCALE_MOBS VÀO ĐỂ GOM CẢ 2 LOẠI QUÁI
-                                SafeKillMob(target, SCALE_MOBS)
-                                task.wait(0.15) 
-                            until not _farmingScale
-                                or not target or not target.Parent
-                                or not target:FindFirstChild("Humanoid")
-                                or target.Humanoid.Health <= 0
+                            
+                            local targetPos = target:GetAttribute("LockedPos")
+                            if not targetPos then
+                                targetPos = target.HumanoidRootPart.Position
+                                target:SetAttribute("LockedPos", targetPos)
+                            end
+
+                            BringEnemy(targetPos, SCALE_MOBS)
+
+                            local attackPos = CFrame.new(targetPos + Vector3.new(0, 30, 0), targetPos)
+                            SmoothTween(attackPos, 300)
+
+                            local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+                            if hrp and (hrp.Position - targetPos).Magnitude <= 50 then
+                                EquipWeaponTool("Melee")
+                                FastAttack(SCALE_MOBS)
+                                if tick() - lastKenCall >= 10 then
+                                    lastKenCall = tick()
+                                    pcall(function() ReplicatedStorage.Remotes.CommE:FireServer("Ken", true) end)
+                                end
+                            end
                         else
                             SmoothTween(SCALE_POS * CFrame.new(0, 30, 0), 300)
                         end
                     end)
-                    task.wait(0.2)
+                    task.wait(0.15)
                 end
                 
                 StopSmoothTween()
@@ -740,8 +705,8 @@ do
             end
         end
 
--- ==========================================
-        -- BƯỚC B: FARM BLAZE EMBER (Auto Dragon Hunter)
+        -- ==========================================
+        -- BƯỚC B: FARM BLAZE EMBER
         -- ==========================================
         do
             local invB, _ = GetInventory()
@@ -755,8 +720,8 @@ do
                 local DOJO_POS  = CFrame.new(5813, 1208, 884)
                 local HYDRA_POS = CFrame.new(4620.61572265625, 1002.2954711914062, 399.0868835449219)
                 local _farmingEmber = true
+                local isCollectingEmber = false -- BIẾN KHÓA LUỒNG
 
-                -- 1. Hàm kiểm tra thông tin Quest Dragon Hunter
                 local function checkDragonQuest()
                     local questData = nil
                     local hasQuest  = false
@@ -786,7 +751,6 @@ do
                     return hasQuest, mobName, questCount, questType
                 end
 
-                -- 2. Hàm kiểm tra xem đã xong và cần quay về Dojo chưa
                 local function isBackToDojo()
                     local result = false
                     pcall(function()
@@ -801,7 +765,6 @@ do
                     return result
                 end
 
-                -- 3. Hàm Claim Quest ở Dojo Trainer
                 local function claimDragonQuest()
                     pcall(function()
                         local Net = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
@@ -811,26 +774,31 @@ do
                     end)
                 end
 
-                -- 4. Luồng chạy ngầm chuyên săn Ember rớt ra trên map
+                -- LUỒNG NHẶT EMBER CÁCH LY
                 task.spawn(function()
                     while _farmingEmber do
                         pcall(function()
-                            if workspace:FindFirstChild("EmberTemplate") and workspace.EmberTemplate:FindFirstChild("Part") then
-                                if Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
-                                    if _tweenGhost then
-                                        -- Cập nhật CFrame bóng để player tự tele theo ăn Ember
-                                        _tweenGhost.CFrame = workspace.EmberTemplate.Part.CFrame
-                                    end
+                            local ember = workspace:FindFirstChild("EmberTemplate")
+                            if ember and ember:FindFirstChild("Part") then
+                                isCollectingEmber = true
+                                StopSmoothTween() -- Tạm dừng đánh quái
+                                local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+                                if hrp then
+                                    hrp.CFrame = ember.Part.CFrame
                                 end
+                            else
+                                isCollectingEmber = false
                             end
                         end)
-                        task.wait(0.15)
+                        task.wait(0.1)
                     end
                 end)
 
-                -- Bắt đầu Loop Farm
+                -- LUỒNG CHÍNH FARM EMBER
                 while _farmingEmber do
                     pcall(function()
+                        if isCollectingEmber then return end -- NẾU ĐANG NHẶT EMBER THÌ BỎ QUA ĐÁNH QUÁI
+
                         local invLoop, _ = GetInventory()
                         local _, nowEmber = HasItem(invLoop, "Blaze Ember")
                         ActionStatus.Text = string.format("Hành động: [3.1-B] Đang farm Blaze Ember (%d/55)...", nowEmber)
@@ -849,15 +817,27 @@ do
                                     local target = FindClosestMob({mobName})
                                     if target then
                                         EnsureBuso()
-                                        repeat
-                                            -- Đã cập nhật truyền Array {mobName} để gom quái giống Dragon Scale
-                                            SafeKillMob(target, {mobName})
-                                            task.wait(0.15)
-                                        until not _farmingEmber
-                                            or not target or not target.Parent
-                                            or not target:FindFirstChild("Humanoid")
-                                            or target.Humanoid.Health <= 0
-                                            or isBackToDojo()
+                                        
+                                        local targetPos = target:GetAttribute("LockedPos")
+                                        if not targetPos then
+                                            targetPos = target.HumanoidRootPart.Position
+                                            target:SetAttribute("LockedPos", targetPos)
+                                        end
+
+                                        BringEnemy(targetPos, {mobName})
+
+                                        local attackPos = CFrame.new(targetPos + Vector3.new(0, 30, 0), targetPos)
+                                        SmoothTween(attackPos, 300)
+
+                                        local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+                                        if hrp and (hrp.Position - targetPos).Magnitude <= 50 then
+                                            EquipWeaponTool("Melee")
+                                            FastAttack({mobName})
+                                            if tick() - lastKenCall >= 10 then
+                                                lastKenCall = tick()
+                                                pcall(function() ReplicatedStorage.Remotes.CommE:FireServer("Ken", true) end)
+                                            end
+                                        end
                                     else
                                         SmoothTween(HYDRA_POS * CFrame.new(0, 30, 0), 300)
                                     end
@@ -868,29 +848,25 @@ do
                                 pcall(function()
                                     local tree = workspace.Map.Waterfall.IslandModel:FindFirstChild("Meshes/bambootree", true)
                                     if tree then
-                                        TweenTo(tree.CFrame * CFrame.new(4, 0, 0))
+                                        SmoothTween(tree.CFrame * CFrame.new(4, 0, 0), 300)
                                         local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-                                        if hrp and (tree.Position - hrp.Position).Magnitude <= 50 then
+                                        if hrp and (hrp.Position - tree.Position).Magnitude <= 15 then
                                             UseAllSkills()
                                         end
                                     end
                                 end)
                             end
                         else
-                            -- Không có quest / Cần quay về Dojo -> Ngắt lơ lửng -> Tween Về -> Nhận -> Bật lơ lửng lại
-                            StopSmoothTween()
-                            if isBackToDojo() then
-                                TweenTo(DOJO_POS)
-                                task.wait(0.3)
+                            -- Về Dojo
+                            SmoothTween(DOJO_POS, 300)
+                            local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+                            if hrp and (hrp.Position - DOJO_POS.Position).Magnitude <= 15 then
                                 claimDragonQuest()
-                                task.wait(0.5)
-                            else
-                                TweenTo(DOJO_POS)
                                 task.wait(0.5)
                             end
                         end
                     end)
-                    task.wait(0.2)
+                    task.wait(0.15)
                 end
 
                 StopSmoothTween()
