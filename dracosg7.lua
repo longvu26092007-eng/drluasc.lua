@@ -183,26 +183,6 @@ local function EquipWeaponTool(tooltipName)
     end
 end
 
--- BringEnemy: kéo mob về 1 điểm, freeze movement (từ Banana)
-local function BringEnemy(centerPos)
-    pcall(function()
-        Player.SimulationRadius = math.huge
-        for _, v in pairs(workspace.Enemies:GetChildren()) do
-            if v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 and v:FindFirstChild("HumanoidRootPart") then
-                if (v.HumanoidRootPart.Position - centerPos).Magnitude <= 300 then
-                    v.HumanoidRootPart.CFrame = CFrame.new(centerPos)
-                    v.HumanoidRootPart.CanCollide = true
-                    v.Humanoid.WalkSpeed = 0
-                    v.Humanoid.JumpPower = 0
-                    if v.Humanoid:FindFirstChild("Animator") then
-                        v.Humanoid.Animator:Destroy()
-                    end
-                end
-            end
-        end
-    end)
-end
-
 -- ==========================================
 -- Ghost Float System (KaitunBoss TweenGhost pattern)
 -- Part ẩn Anchored 50x50x50, Heartbeat mỗi frame lock player → không rơi
@@ -298,39 +278,6 @@ local function FindClosestMob(mobNames)
 end
 
 local lastKenCall = tick()
--- KillMonster: bay trên đầu 1 con mob, đánh nó (gọi mỗi tick trong repeat loop)
--- SetFloatPos di chuyển ghost → Heartbeat giữ player ở đó liên tục
-local function KillMonster(targetModel)
-    xpcall(function()
-        if not targetModel or not targetModel.Parent then return end
-        local vh = targetModel:FindFirstChild("Humanoid")
-        local vhrp = targetModel:FindFirstChild("HumanoidRootPart")
-        if not vh or vh.Health <= 0 or not vhrp then return end
-
-        -- Lock vị trí gốc của mob (Banana style)
-        if not targetModel:GetAttribute("Locked") then
-            targetModel:SetAttribute("Locked", vhrp.CFrame)
-        end
-        local lockedPos = targetModel:GetAttribute("Locked").Position
-
-        -- BringEnemy: kéo mob về, freeze
-        BringEnemy(lockedPos)
-
-        -- Di chuyển ghost trên đầu mob 30 stud → Heartbeat lock player theo
-        SetFloatPos(vhrp.CFrame * CFrame.new(0, 30, 0) * CFrame.Angles(0, math.rad(180), 0))
-
-        -- Equip + FastAttack (KaitunBoss encrypted)
-        EquipWeaponTool("Melee")
-        FastAttack(targetModel.Name)
-
-        -- Ken Haki mỗi 10s
-        if tick() - lastKenCall >= 10 then
-            lastKenCall = tick()
-            pcall(function() ReplicatedStorage.Remotes.CommE:FireServer("Ken", true) end)
-        end
-
-    end, function(e) warn("[DracoAuto] KillMonster ERROR:", e) end)
-end
 
 local function EnsureBuso()
     pcall(function()
@@ -716,7 +663,7 @@ do
         local EMBER_MIN = 55
 
         -- ==========================================
-        -- BƯỚC A: FARM DRAGON SCALE (ĐÃ FIX SECURITY KICK)
+        -- BƯỚC A: FARM DRAGON SCALE (CHUẨN KAITUNBOSS FIX SECURITY KICK)
         -- ==========================================
         do
             local invA, _ = GetInventory()
@@ -732,7 +679,8 @@ do
                 local SCALE_POS  = CFrame.new(6594, 383, 139)
                 local _farmingScale = true
 
-                -- FIX SECURITY KICK: Viết lại logic đánh riêng an toàn cho Scale
+                -- FIX SECURITY KICK: Logic attack của KaitunBoss
+                -- KHÔNG thao túng vật lý của quái, chỉ đứng cách 20 stud và FastAttack
                 local function SafeKillScaleMob(targetModel)
                     xpcall(function()
                         if not targetModel or not targetModel.Parent then return end
@@ -740,38 +688,36 @@ do
                         local vhrp = targetModel:FindFirstChild("HumanoidRootPart")
                         if not vh or vh.Health <= 0 or not vhrp then return end
 
-                        if not targetModel:GetAttribute("Locked") then
-                            targetModel:SetAttribute("Locked", vhrp.CFrame)
-                        end
-                        local lockedPos = targetModel:GetAttribute("Locked").Position
+                        local dx = HumanoidRootPart.Position.X - vhrp.Position.X
+                        local dy = HumanoidRootPart.Position.Y - vhrp.Position.Y
+                        local dz = HumanoidRootPart.Position.Z - vhrp.Position.Z
+                        local sqrMag = dx*dx + dy*dy + dz*dz
 
-                        -- Giữ mob an toàn, không thay đổi WalkSpeed hay phá Animator để tránh Anti-Cheat quét
-                        pcall(function()
-                            if (vhrp.Position - lockedPos).Magnitude > 5 then
-                                vhrp.CFrame = CFrame.new(lockedPos)
+                        -- Check khoảng cách <= 70 stud như KaitunBoss
+                        if sqrMag <= 4900 then
+                            EquipWeaponTool("Melee")
+                            FastAttack(targetModel.Name)
+
+                            if tick() - lastKenCall >= 10 then
+                                lastKenCall = tick()
+                                pcall(function() ReplicatedStorage.Remotes.CommE:FireServer("Ken", true) end)
                             end
-                            vhrp.CanCollide = false
-                        end)
 
-                        -- GIẢM ĐỘ CAO XUỐNG CÒN 15 STUD (Tầm đánh an toàn, 30 stud dễ bị AC soi Reach hack)
-                        local safePos = CFrame.new(lockedPos) * CFrame.new(0, 15, 0) * CFrame.Angles(math.rad(-90), 0, 0)
-                        SetFloatPos(safePos)
-
-                        EquipWeaponTool("Melee")
-                        FastAttack(targetModel.Name)
-
-                        if tick() - lastKenCall >= 10 then
-                            lastKenCall = tick()
-                            pcall(function() ReplicatedStorage.Remotes.CommE:FireServer("Ken", true) end)
+                            -- Di chuyển lơ lửng an toàn cách quái 20 stud
+                            local yOffset = vhrp.Position.Y > 60 and -20 or 20
+                            local safePos = CFrame.new(vhrp.Position + (vhrp.CFrame.LookVector * 20) + Vector3.new(0, yOffset, 0), vhrp.Position)
+                            SetFloatPos(safePos)
+                        else
+                            -- Bay đến nếu xa quá
+                            TweenTo(vhrp.CFrame * CFrame.new(0, 20, 0))
                         end
                     end, function(e) warn("[DracoAuto] SafeKillScaleMob ERROR:", e) end)
                 end
 
-                -- Bật float để lơ lửng
+                -- Bay lơ lửng đến bãi quái
                 StartFloat()
-                -- Bay tới bãi với độ cao 15
-                TweenTo(SCALE_POS * CFrame.new(0, 15, 0))
-                SetFloatPos(SCALE_POS * CFrame.new(0, 15, 0))
+                TweenTo(SCALE_POS * CFrame.new(0, 30, 0))
+                SetFloatPos(SCALE_POS * CFrame.new(0, 30, 0))
 
                 while _farmingScale do
                     pcall(function()
@@ -790,13 +736,13 @@ do
                             EnsureBuso()
                             repeat
                                 SafeKillScaleMob(target)
-                                task.wait(0.2) -- Tăng delay lên 0.2s để giảm tải remote packet
+                                task.wait(0.15)
                             until not _farmingScale
                                 or not target or not target.Parent
                                 or not target:FindFirstChild("Humanoid")
                                 or target.Humanoid.Health <= 0
                         else
-                            SetFloatPos(SCALE_POS * CFrame.new(0, 15, 0))
+                            SetFloatPos(SCALE_POS * CFrame.new(0, 30, 0))
                         end
                     end)
                     task.wait(0.2)
@@ -817,12 +763,6 @@ do
 
         -- ==========================================
         -- BƯỚC B: FARM BLAZE EMBER (Auto Dragon Hunter)
-        -- Quest: RF/DragonHunter → Defeat mob hoặc Destroy bambootree
-        -- Mob: "Hydra Enforcer", "Venomous Assailant"
-        -- Vị trí mob: CFrame.new(4620, 1002, 399)
-        -- Dojo claim: CFrame.new(5813, 1208, 884)
-        -- Ember: workspace.EmberTemplate.Part
-        -- Attack: KillMonster + FastAttack (KaitunBoss)
         -- ==========================================
         do
             local invB, _ = GetInventory()
@@ -838,7 +778,6 @@ do
                 local HYDRA_POS = CFrame.new(4620.61572265625, 1002.2954711914062, 399.0868835449219)
                 local _farmingEmber = true
 
-                -- Check quest Dragon Hunter (logic từ Banana)
                 local function checkDragonQuest()
                     local questData = nil
                     local hasQuest  = false
@@ -871,7 +810,6 @@ do
                     return hasQuest, mobName, questCount, questType
                 end
 
-                -- Check notification hoàn thành quest
                 local function isBackToDojo()
                     local result = false
                     pcall(function()
@@ -886,7 +824,6 @@ do
                     return result
                 end
 
-                -- Claim quest tại Dojo
                 local function claimDragonQuest()
                     pcall(function()
                         local Net = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
@@ -896,13 +833,43 @@ do
                     end)
                 end
 
-                -- Thread phụ: nhặt Ember (direct CFrame, không dùng SetFloatPos để tránh conflict combat)
+                -- Trình diệt quái Ember an toàn giống Scale
+                local function SafeKillEmberMob(targetModel)
+                    xpcall(function()
+                        if not targetModel or not targetModel.Parent then return end
+                        local vh = targetModel:FindFirstChild("Humanoid")
+                        local vhrp = targetModel:FindFirstChild("HumanoidRootPart")
+                        if not vh or vh.Health <= 0 or not vhrp then return end
+
+                        local dx = HumanoidRootPart.Position.X - vhrp.Position.X
+                        local dy = HumanoidRootPart.Position.Y - vhrp.Position.Y
+                        local dz = HumanoidRootPart.Position.Z - vhrp.Position.Z
+                        local sqrMag = dx*dx + dy*dy + dz*dz
+
+                        if sqrMag <= 4900 then
+                            EquipWeaponTool("Melee")
+                            FastAttack(targetModel.Name)
+
+                            if tick() - lastKenCall >= 10 then
+                                lastKenCall = tick()
+                                pcall(function() ReplicatedStorage.Remotes.CommE:FireServer("Ken", true) end)
+                            end
+
+                            local yOffset = vhrp.Position.Y > 60 and -20 or 20
+                            local safePos = CFrame.new(vhrp.Position + (vhrp.CFrame.LookVector * 20) + Vector3.new(0, yOffset, 0), vhrp.Position)
+                            SetFloatPos(safePos)
+                        else
+                            TweenTo(vhrp.CFrame * CFrame.new(0, 20, 0))
+                        end
+                    end, function(e) warn("[DracoAuto] SafeKillEmberMob ERROR:", e) end)
+                end
+
+                -- Thread phụ nhặt Ember
                 task.spawn(function()
                     while _farmingEmber do
                         pcall(function()
                             if workspace:FindFirstChild("EmberTemplate") and workspace.EmberTemplate:FindFirstChild("Part") then
                                 if Character and HumanoidRootPart then
-                                    -- Flash CFrame 1 frame để nhặt, Heartbeat sẽ kéo về ghost ngay frame sau
                                     HumanoidRootPart.CFrame = workspace.EmberTemplate.Part.CFrame
                                 end
                             end
@@ -911,10 +878,8 @@ do
                     end
                 end)
 
-                -- Bật float
                 StartFloat()
 
-                -- Loop chính farm Dragon Hunter
                 while _farmingEmber do
                     pcall(function()
                         local invLoop, _ = GetInventory()
@@ -934,10 +899,9 @@ do
                                 if mobName == "Hydra Enforcer" or mobName == "Venomous Assailant" then
                                     local target = FindClosestMob({mobName})
                                     if target then
-                                        -- Lock con này, đánh đến chết
                                         EnsureBuso()
                                         repeat
-                                            KillMonster(target)
+                                            SafeKillEmberMob(target)
                                             task.wait(0.15)
                                         until not _farmingEmber
                                             or not target or not target.Parent
@@ -945,7 +909,6 @@ do
                                             or target.Humanoid.Health <= 0
                                             or isBackToDojo()
                                     else
-                                        -- Mob chưa spawn → float giữ tại vùng mob chờ
                                         SetFloatPos(HYDRA_POS * CFrame.new(0, 30, 0))
                                     end
                                 end
@@ -955,19 +918,16 @@ do
                                 pcall(function()
                                     local tree = workspace.Map.Waterfall.IslandModel:FindFirstChild("Meshes/bambootree", true)
                                     if tree then
-                                        -- Tạm tắt float để đến cây
                                         StopFloat()
                                         TweenTo(tree.CFrame * CFrame.new(4, 0, 0))
                                         if HumanoidRootPart and (tree.Position - HumanoidRootPart.Position).Magnitude <= 200 then
                                             UseAllSkills()
                                         end
-                                        -- Bật lại float
                                         StartFloat()
                                     end
                                 end)
                             end
                         else
-                            -- Không có quest / cần quay về Dojo → tắt float, bay về, claim, bật lại
                             StopFloat()
                             if isBackToDojo() then
                                 TweenTo(DOJO_POS)
@@ -984,9 +944,7 @@ do
                     task.wait(0.2)
                 end
 
-                -- Tắt float
                 StopFloat()
-
                 _farmingEmber = false
 
                 local invFinal, _ = GetInventory()
