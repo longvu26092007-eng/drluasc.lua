@@ -716,10 +716,7 @@ do
         local EMBER_MIN = 55
 
         -- ==========================================
-        -- BƯỚC A: FARM DRAGON SCALE (tự đánh mob)
-        -- Mob: "Dragon Crew Archer", "Dragon Crew Warrior"
-        -- Vị trí spawn: CFrame.new(6594, 383, 139)
-        -- Attack: KillMonster + FastAttack (KaitunBoss)
+        -- BƯỚC A: FARM DRAGON SCALE (ĐÃ FIX SECURITY KICK)
         -- ==========================================
         do
             local invA, _ = GetInventory()
@@ -735,11 +732,46 @@ do
                 local SCALE_POS  = CFrame.new(6594, 383, 139)
                 local _farmingScale = true
 
+                -- FIX SECURITY KICK: Viết lại logic đánh riêng an toàn cho Scale
+                local function SafeKillScaleMob(targetModel)
+                    xpcall(function()
+                        if not targetModel or not targetModel.Parent then return end
+                        local vh = targetModel:FindFirstChild("Humanoid")
+                        local vhrp = targetModel:FindFirstChild("HumanoidRootPart")
+                        if not vh or vh.Health <= 0 or not vhrp then return end
+
+                        if not targetModel:GetAttribute("Locked") then
+                            targetModel:SetAttribute("Locked", vhrp.CFrame)
+                        end
+                        local lockedPos = targetModel:GetAttribute("Locked").Position
+
+                        -- Giữ mob an toàn, không thay đổi WalkSpeed hay phá Animator để tránh Anti-Cheat quét
+                        pcall(function()
+                            if (vhrp.Position - lockedPos).Magnitude > 5 then
+                                vhrp.CFrame = CFrame.new(lockedPos)
+                            end
+                            vhrp.CanCollide = false
+                        end)
+
+                        -- GIẢM ĐỘ CAO XUỐNG CÒN 15 STUD (Tầm đánh an toàn, 30 stud dễ bị AC soi Reach hack)
+                        local safePos = CFrame.new(lockedPos) * CFrame.new(0, 15, 0) * CFrame.Angles(math.rad(-90), 0, 0)
+                        SetFloatPos(safePos)
+
+                        EquipWeaponTool("Melee")
+                        FastAttack(targetModel.Name)
+
+                        if tick() - lastKenCall >= 10 then
+                            lastKenCall = tick()
+                            pcall(function() ReplicatedStorage.Remotes.CommE:FireServer("Ken", true) end)
+                        end
+                    end, function(e) warn("[DracoAuto] SafeKillScaleMob ERROR:", e) end)
+                end
+
                 -- Bật float để lơ lửng
                 StartFloat()
-                -- Tween đến vùng mob trước, sau đó float giữ ở đó
-                TweenTo(SCALE_POS * CFrame.new(0, 30, 0))
-                SetFloatPos(SCALE_POS * CFrame.new(0, 30, 0))
+                -- Bay tới bãi với độ cao 15
+                TweenTo(SCALE_POS * CFrame.new(0, 15, 0))
+                SetFloatPos(SCALE_POS * CFrame.new(0, 15, 0))
 
                 while _farmingScale do
                     pcall(function()
@@ -752,28 +784,24 @@ do
                             return
                         end
 
-                        -- Tìm con mob gần nhất (Archer hoặc Warrior đều được)
                         local target = FindClosestMob(SCALE_MOBS)
 
                         if target then
-                            -- Lock con này, đánh đến chết mới chuyển con khác
                             EnsureBuso()
                             repeat
-                                KillMonster(target)
-                                task.wait(0.15)
+                                SafeKillScaleMob(target)
+                                task.wait(0.2) -- Tăng delay lên 0.2s để giảm tải remote packet
                             until not _farmingScale
                                 or not target or not target.Parent
                                 or not target:FindFirstChild("Humanoid")
                                 or target.Humanoid.Health <= 0
                         else
-                            -- Không thấy mob → float giữ tại vùng spawn chờ respawn
-                            SetFloatPos(SCALE_POS * CFrame.new(0, 30, 0))
+                            SetFloatPos(SCALE_POS * CFrame.new(0, 15, 0))
                         end
                     end)
                     task.wait(0.2)
                 end
 
-                -- Tắt anti-gravity
                 StopFloat()
 
                 local invFinal, _ = GetInventory()
