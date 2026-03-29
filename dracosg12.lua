@@ -183,37 +183,71 @@ local function EquipWeaponTool(tooltipName)
     end
 end
 
+-- BringEnemy: kéo mob về 1 điểm, freeze movement (từ Banana)
+local function BringEnemy(centerPos)
+    pcall(function()
+        Player.SimulationRadius = math.huge
+        for _, v in pairs(workspace.Enemies:GetChildren()) do
+            if v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 and v:FindFirstChild("HumanoidRootPart") then
+                if (v.HumanoidRootPart.Position - centerPos).Magnitude <= 300 then
+                    v.HumanoidRootPart.CFrame = CFrame.new(centerPos)
+                    v.HumanoidRootPart.CanCollide = true
+                    v.Humanoid.WalkSpeed = 0
+                    v.Humanoid.JumpPower = 0
+                    if v.Humanoid:FindFirstChild("Animator") then
+                        v.Humanoid.Animator:Destroy()
+                    end
+                end
+            end
+        end
+    end)
+end
+
 local lastKenCall = tick()
 local function KillMonster(x)
     xpcall(function()
+        -- Tìm mob trong workspace.Enemies
         if workspace.Enemies:FindFirstChild(x) then
             for _, v in next, workspace.Enemies:GetChildren() do
                 local vh = v:FindFirstChild("Humanoid")
                 local vhrp = v:FindFirstChild("HumanoidRootPart")
                 if vh and vh.Health > 0 and vhrp and v.Name == x then
-                    local dx = HumanoidRootPart.Position.X - vhrp.Position.X
-                    local dy = HumanoidRootPart.Position.Y - vhrp.Position.Y
-                    local dz = HumanoidRootPart.Position.Z - vhrp.Position.Z
-                    local sqrMag = dx * dx + dy * dy + dz * dz
-                    if sqrMag <= 4900 then
+                    -- Lock vị trí gốc của mob (Banana style)
+                    if not v:GetAttribute("Locked") then
+                        v:SetAttribute("Locked", vhrp.CFrame)
+                    end
+                    local lockedPos = v:GetAttribute("Locked").Position
+
+                    local dist = (HumanoidRootPart.Position - vhrp.Position).Magnitude
+
+                    if dist <= 70 then
+                        -- Trong tầm → BringEnemy + bay trên đầu 30 stud + FastAttack
+                        BringEnemy(lockedPos)
                         FastAttack(x)
+
                         if tick() - lastKenCall >= 10 then
                             lastKenCall = tick()
                             ReplicatedStorage.Remotes.CommE:FireServer("Ken", true)
                         end
-                        TweenTo(CFrame.new(vhrp.Position + (vhrp.CFrame.LookVector * 20) + Vector3.new(0, vhrp.Position.Y > 60 and -20 or 20, 0)))
+
+                        -- Bay trên đầu mob 30 stud, quay mặt xuống (Banana style)
                         EquipWeaponTool("Melee")
+                        TweenTo(vhrp.CFrame * CFrame.new(0, 30, 0) * CFrame.Angles(0, math.rad(180), 0))
                         return
                     end
-                    TweenTo(vhrp.CFrame)
+
+                    -- Xa → tween đến mob
+                    TweenTo(vhrp.CFrame * CFrame.new(0, 30, 0))
                     return
                 end
             end
         end
+
+        -- Mob trong ReplicatedStorage (chưa spawn) → tween đến
         for _, v in next, ReplicatedStorage:GetChildren() do
             local vhrp = v:FindFirstChild("HumanoidRootPart")
             if v:IsA("Model") and vhrp and v.Name == x then
-                TweenTo(vhrp.CFrame)
+                TweenTo(vhrp.CFrame * CFrame.new(0, 30, 0))
                 return
             end
         end
@@ -226,6 +260,29 @@ local function EnsureBuso()
             COMMF_:InvokeServer("Buso")
         end
     end)
+end
+
+-- PressKey: bấm phím skill (từ KaitunBoss PressKeyEvent + Banana Useskills)
+local VIM = game:GetService("VirtualInputManager")
+local function PressKey(key, delay)
+    VIM:SendKeyEvent(true, key, false, game)
+    task.wait(delay or 0)
+    VIM:SendKeyEvent(false, key, false, game)
+end
+
+-- UseSkills: spam tất cả skills để phá bambootree (từ Banana)
+local function UseAllSkills()
+    EquipWeaponTool("Melee")
+    task.wait(0.1)
+    PressKey("Z") PressKey("X") PressKey("C")
+    task.wait(0.3)
+    EquipWeaponTool("Sword")
+    task.wait(0.1)
+    PressKey("Z") PressKey("X")
+    task.wait(0.3)
+    EquipWeaponTool("Melee")
+    task.wait(0.1)
+    PressKey("Z") PressKey("X") PressKey("C")
 end
 
 -- ==========================================
@@ -785,8 +842,8 @@ do
                                     local tree = workspace.Map.Waterfall.IslandModel:FindFirstChild("Meshes/bambootree", true)
                                     if tree then
                                         TweenTo(tree.CFrame * CFrame.new(4, 0, 0))
-                                        if (tree.Position - HumanoidRootPart.Position).Magnitude <= 200 then
-                                            FastAttack()
+                                        if HumanoidRootPart and (tree.Position - HumanoidRootPart.Position).Magnitude <= 200 then
+                                            UseAllSkills()
                                         end
                                     end
                                 end)
