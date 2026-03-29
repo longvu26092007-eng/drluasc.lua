@@ -1,10 +1,6 @@
 -- ==========================================
 -- [ KEY CHECK ] — Lấy key từ executor bên ngoài
 -- ==========================================
--- Cách dùng ở executor:
---   getgenv().Key = "51e126ee832d3c4fff7b6178"
---   loadstring(game:HttpGet("...link git chứa lua..."))()
--- ==========================================
 local NhapKey = getgenv().Key
 
 if not NhapKey or NhapKey == "" then
@@ -66,61 +62,94 @@ Player.CharacterAdded:Connect(function(v)
     HumanoidRootPart = v:WaitForChild("HumanoidRootPart")
 end)
 
-local function TweenTo(targetCFrame)
-    local character = Player.Character or Player.CharacterAdded:Wait()
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return false end
+-- ==========================================
+-- [ 1.1 ] HỆ THỐNG DI CHUYỂN BÓNG (CHUẨN KAITUNBOSS)
+-- Fix hoàn toàn lỗi giật tại chỗ
+-- ==========================================
+local _tweenGhost = nil
+local _tweenConn  = nil
+local _tweenObj   = nil
 
-    local hrp      = character:WaitForChild("HumanoidRootPart")
-    local humanoid = character:WaitForChild("Humanoid")
+local function SmoothTween(targetCFrame, speed)
+    speed = speed or 300
+    local char = Player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = char.HumanoidRootPart
 
-    local distance = (hrp.Position - targetCFrame.Position).Magnitude
-    if distance <= 250 then
-        hrp.CFrame = targetCFrame
-        return true
+    -- Tạo bóng (Ghost) nếu chưa có
+    if not _tweenGhost or not _tweenGhost.Parent then
+        _tweenGhost = Instance.new("Part")
+        _tweenGhost.Name         = "DracoGhost"
+        _tweenGhost.Transparency = 1
+        _tweenGhost.Anchored     = true
+        _tweenGhost.CanCollide   = false
+        _tweenGhost.Size         = Vector3.new(50, 50, 50)
+        _tweenGhost.CFrame       = hrp.CFrame
+        _tweenGhost.Parent       = workspace
     end
 
-    local bv = hrp:FindFirstChild("DracoAntiGravity") or Instance.new("BodyVelocity")
-    bv.Name     = "DracoAntiGravity"
-    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bv.Velocity = Vector3.new(0, 0, 0)
-    bv.Parent   = hrp
+    if _tweenObj then _tweenObj:Cancel(); _tweenObj = nil end
 
-    local speed    = 300
-    local time     = distance / speed
-    local tweenObj = TweenService:Create(hrp, TweenInfo.new(time, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
+    local dist = (targetCFrame.Position - _tweenGhost.Position).Magnitude
+    local timeToTween = dist / speed
 
-    local noclip
-    noclip = RunService.Stepped:Connect(function()
-        if humanoid and humanoid.Parent then
-            humanoid:ChangeState(11)
-        end
-        if character and character.Parent then
-            for _, part in pairs(character:GetDescendants()) do
-                if part:IsA("BasePart") and part.CanCollide then
-                    part.CanCollide = false
+    -- Tween bóng đi cực mượt
+    if dist > 5000 then
+        _tweenGhost.CFrame = targetCFrame
+    else
+        _tweenObj = TweenService:Create(_tweenGhost, TweenInfo.new(timeToTween, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
+        _tweenObj:Play()
+    end
+
+    -- Khóa chặt người chơi vào bóng mỗi khung hình
+    if not _tweenConn then
+        _tweenConn = RunService.Heartbeat:Connect(function()
+            pcall(function()
+                local c = Player.Character
+                if c and c:FindFirstChild("HumanoidRootPart") and _tweenGhost and _tweenGhost.Parent then
+                    c.HumanoidRootPart.CFrame = _tweenGhost.CFrame
+                    local h = c:FindFirstChild("Humanoid")
+                    if h then h.Sit = false end
+                    for _, p in pairs(c:GetDescendants()) do
+                        if p:IsA("BasePart") and p.CanCollide then
+                            p.CanCollide = false
+                        end
+                    end
                 end
-            end
+            end)
+        end)
+    end
+end
+
+local function StopSmoothTween()
+    if _tweenObj then _tweenObj:Cancel(); _tweenObj = nil end
+    if _tweenConn then _tweenConn:Disconnect(); _tweenConn = nil end
+    if _tweenGhost then _tweenGhost:Destroy(); _tweenGhost = nil end
+    pcall(function()
+        if Player.Character and Player.Character:FindFirstChild("Humanoid") then
+            Player.Character.Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
         end
     end)
+end
 
-    tweenObj:Play()
-    tweenObj.Completed:Wait()
+-- Tween có chờ đến nơi
+local function TweenTo(targetCFrame, speed)
+    local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
 
-    if bv and bv.Parent then bv:Destroy() end
-    if noclip then noclip:Disconnect() end
+    SmoothTween(targetCFrame, speed)
 
-    if humanoid and humanoid.Parent and humanoid.Health > 0 then
-        humanoid:ChangeState(8)
-        return true
+    while _tweenGhost and _tweenGhost.Parent and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") do
+        local dist = (Player.Character.HumanoidRootPart.Position - targetCFrame.Position).Magnitude
+        if dist <= 10 then break end
+        task.wait(0.1)
     end
-    return false
+    return true
 end
 
 -- ==========================================
 -- [ PHẦN 1.3 ] HỆ THỐNG ATTACK (từ KaitunBoss)
--- Bảo mật: seed + remoteAttack + XOR encrypted hit
 -- ==========================================
-
 local COMMF_ = ReplicatedStorage:WaitForChild("Remotes") and ReplicatedStorage.Remotes:WaitForChild("CommF_")
 local remoteAttack, idremote
 local seed = ReplicatedStorage.Modules.Net.seed:InvokeServer()
@@ -183,77 +212,6 @@ local function EquipWeaponTool(tooltipName)
     end
 end
 
--- ==========================================
--- Ghost Float System (KaitunBoss TweenGhost pattern)
--- Part ẩn Anchored 50x50x50, Heartbeat mỗi frame lock player → không rơi
--- ==========================================
-local _floatGhost = nil     -- Part anchored ẩn
-local _floatConn  = nil     -- Heartbeat connection
-
-local function StartFloat()
-    if _floatConn then return end
-
-    -- Tạo ghost part giống KaitunBoss: Anchored, 50x50x50, ẩn
-    if not _floatGhost or not _floatGhost.Parent then
-        _floatGhost = Instance.new("Part")
-        _floatGhost.Name         = "DracoFloatGhost"
-        _floatGhost.Transparency = 1
-        _floatGhost.Anchored     = true
-        _floatGhost.CanCollide   = false
-        _floatGhost.Size         = Vector3.new(50, 50, 50)
-        _floatGhost.Parent       = workspace
-        if HumanoidRootPart then
-            _floatGhost.CFrame = HumanoidRootPart.CFrame
-        end
-    end
-
-    -- Heartbeat: MỖI FRAME lock player CFrame = ghost CFrame (KaitunBoss cách làm)
-    _floatConn = RunService.Heartbeat:Connect(function()
-        pcall(function()
-            local chr = Player.Character
-            if not chr then return end
-            local hrp = chr:FindFirstChild("HumanoidRootPart")
-            local hum = chr:FindFirstChild("Humanoid")
-            if not hrp or not hum or hum.Health <= 0 then return end
-
-            -- Lock CFrame mỗi frame → player dính ghost, không rơi
-            if _floatGhost and _floatGhost.Parent then
-                hrp.CFrame = _floatGhost.CFrame
-            end
-
-            -- Noclip
-            hum.Sit = false
-            for _, part in pairs(chr:GetDescendants()) do
-                if part:IsA("BasePart") and part.CanCollide then
-                    part.CanCollide = false
-                end
-            end
-        end)
-    end)
-end
-
--- Di chuyển ghost → player tự bay theo mỗi frame
-local function SetFloatPos(cf)
-    if _floatGhost and _floatGhost.Parent then
-        _floatGhost.CFrame = cf
-    end
-end
-
-local function StopFloat()
-    if _floatConn then _floatConn:Disconnect(); _floatConn = nil end
-    pcall(function()
-        if _floatGhost and _floatGhost.Parent then _floatGhost:Destroy() end
-        _floatGhost = nil
-    end)
-    pcall(function()
-        local chr = Player.Character
-        if chr and chr:FindFirstChild("Humanoid") then
-            chr.Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-        end
-    end)
-end
-
--- Tìm mob gần nhất trong danh sách tên
 local function FindClosestMob(mobNames)
     local closest = nil
     local closestDist = math.huge
@@ -278,7 +236,6 @@ local function FindClosestMob(mobNames)
 end
 
 local lastKenCall = tick()
-
 local function EnsureBuso()
     pcall(function()
         if Character and not Character:FindFirstChild("HasBuso") then
@@ -287,7 +244,45 @@ local function EnsureBuso()
     end)
 end
 
--- PressKey: bấm phím skill (từ KaitunBoss PressKeyEvent + Banana Useskills)
+-- ==========================================
+-- HÀM ATTACK AN TOÀN CHUẨN KAITUNBOSS
+-- ==========================================
+local function SafeKillMob(targetModel)
+    xpcall(function()
+        if not targetModel or not targetModel.Parent then return end
+        local vh = targetModel:FindFirstChild("Humanoid")
+        local vhrp = targetModel:FindFirstChild("HumanoidRootPart")
+        if not vh or vh.Health <= 0 or not vhrp then return end
+
+        local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        local dx = hrp.Position.X - vhrp.Position.X
+        local dy = hrp.Position.Y - vhrp.Position.Y
+        local dz = hrp.Position.Z - vhrp.Position.Z
+        local sqrMag = dx*dx + dy*dy + dz*dz
+
+        -- Check khoảng cách an toàn (<= 70) như KaitunBoss
+        if sqrMag <= 4900 then
+            EquipWeaponTool("Melee")
+            FastAttack(targetModel.Name)
+
+            if tick() - lastKenCall >= 10 then
+                lastKenCall = tick()
+                pcall(function() ReplicatedStorage.Remotes.CommE:FireServer("Ken", true) end)
+            end
+
+            -- Canh độ cao tự động (nếu quái thấp thì bay lên 20, cao thì chui xuống -20)
+            local yOffset = vhrp.Position.Y > 60 and -20 or 20
+            local attackPos = CFrame.new(vhrp.Position + (vhrp.CFrame.LookVector * 20) + Vector3.new(0, yOffset, 0), vhrp.Position)
+            SmoothTween(attackPos, 350)
+        else
+            -- Nếu xa thì lướt tới gần
+            SmoothTween(vhrp.CFrame * CFrame.new(0, 20, 0), 350)
+        end
+    end, function(e) warn("[DracoAuto] SafeKillMob ERROR:", e) end)
+end
+
 local VIM = game:GetService("VirtualInputManager")
 local function PressKey(key, delay)
     VIM:SendKeyEvent(true, key, false, game)
@@ -295,7 +290,6 @@ local function PressKey(key, delay)
     VIM:SendKeyEvent(false, key, false, game)
 end
 
--- UseSkills: spam tất cả skills để phá bambootree (từ Banana)
 local function UseAllSkills()
     EquipWeaponTool("Melee")
     task.wait(0.1)
@@ -359,18 +353,17 @@ end
 
 -- ==========================================
 -- [ PHẦN 1.6 ] HÀM GỌI BANANAHUB GỌN
--- Dùng NhapKey từ executor, không hardcode key
 -- ==========================================
 local function LoadBananaHub(config)
     repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
-    getgenv().Key    = NhapKey       -- ← key từ executor
+    getgenv().Key    = NhapKey
     getgenv().NewUI  = true
     getgenv().Config = config
     local ok, err = pcall(function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/obiiyeuem/vthangsitink/main/BananaHub.lua"))()
     end)
     if ok then
-        warn("[DracoAuto] BananaHub load OK! (key=" .. string.sub(NhapKey, 1, 6) .. "***)")
+        warn("[DracoAuto] BananaHub load OK!")
     else
         warn("[DracoAuto] BananaHub load FAIL: " .. tostring(err))
     end
@@ -513,7 +506,6 @@ task.spawn(function()
     end
 end)
 
--- Thread bật Buso Haki định kỳ (từ KaitunBoss)
 task.spawn(function()
     while ScreenGui.Parent do
         EnsureBuso()
@@ -524,7 +516,6 @@ end)
 -- ==========================================
 -- [ PHẦN 3 : AUTOMATIC ]
 -- ==========================================
-
 repeat task.wait(0.5) until ScreenGui and ScreenGui.Parent ~= nil
 repeat task.wait(0.5) until MainFrame and MainFrame.Visible
 task.wait(1)
@@ -534,7 +525,6 @@ ActionStatus.Text = "Hành động: UI sẵn sàng, bắt đầu kiểm tra..."
 -- ==========================================
 -- [ 3.05 ] KIỂM TRA FRAGMENT
 -- ==========================================
-
 local FRAGMENT_MIN = 8000
 
 local function GetFragments()
@@ -548,7 +538,6 @@ do
 
     if frag < FRAGMENT_MIN then
         ActionStatus.Text = "Hành động: [3.05] Fragment thiếu (" .. frag .. "/" .. FRAGMENT_MIN .. "), bắt đầu farm Katakuri..."
-        warn("[DracoAuto] [3.05] Fragment = " .. frag .. " < " .. FRAGMENT_MIN .. " → Chạy FarmFragment!")
 
         LoadBananaHub({
             ["Select Method Farm"] = "Farm Katakuri",
@@ -565,12 +554,10 @@ do
         until frag >= FRAGMENT_MIN
         FragLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
         ActionStatus.Text    = "Hành động: [3.05] ✅ Đủ Fragment (" .. frag .. ")! Tiếp tục kịch bản..."
-        warn("[DracoAuto] [3.05] Fragment đủ rồi → tiếp tục 3.1!")
         task.wait(1)
     else
         ActionStatus.Text    = "Hành động: [3.05] Fragment đủ (" .. frag .. "), bỏ qua farm!"
         FragLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-        warn("[DracoAuto] [3.05] Fragment = " .. frag .. " >= " .. FRAGMENT_MIN .. " → Bỏ qua farm, vào 3.1!")
         task.wait(0.5)
     end
 end
@@ -578,27 +565,17 @@ end
 -- ==========================================
 -- [ 3.1 ] HELPERS DÙNG CHUNG
 -- ==========================================
-
 local function EquipWeapon(weaponName)
     local chr = Player.Character
-    if chr and chr:FindFirstChild(weaponName) then
-        warn("[DracoAuto] EquipWeapon: " .. weaponName .. " đã equip rồi, bỏ qua.")
-        return true
-    end
+    if chr and chr:FindFirstChild(weaponName) then return true end
     local ok, err = pcall(function()
         game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("LoadItem", weaponName)
     end)
-    if ok then
-        warn("[DracoAuto] EquipWeapon: Đã equip " .. weaponName)
-    else
-        warn("[DracoAuto] EquipWeapon: Lỗi equip " .. weaponName .. " → " .. tostring(err))
-    end
     return ok
 end
 
 local _lastInvCache = nil
 local _invFailCount = 0
-
 local function GetInventory()
     local ok, inv = pcall(function()
         return game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("getInventory")
@@ -609,9 +586,7 @@ local function GetInventory()
         return inv, true
     end
     _invFailCount = _invFailCount + 1
-    if _lastInvCache ~= nil then
-        return _lastInvCache, false
-    end
+    if _lastInvCache ~= nil then return _lastInvCache, false end
     return {}, false
 end
 
@@ -631,20 +606,14 @@ end
 -- ==========================================
 -- [ 3.1 ] LUỒNG CHÍNH — CHECK HEART & STORM
 -- ==========================================
-
 do
     local inv, _ = GetInventory()
     local hasHeart, _ = HasItem(inv, "Dragonheart")
     local hasStorm, _ = HasItem(inv, "Dragonstorm")
 
-    WeaponRowLabel.Text = string.format(
-        "Heart: %s  |  Storm: %s",
-        hasHeart and "✅" or "❌",
-        hasStorm and "✅" or "❌"
-    )
+    WeaponRowLabel.Text = string.format("Heart: %s  |  Storm: %s", hasHeart and "✅" or "❌", hasStorm and "✅" or "❌")
 
     if hasHeart and hasStorm then
-        warn("[DracoAuto] [3.1] Luồng 1: Phát hiện Heart + Storm!")
         ActionStatus.Text = "Hành động: [3.1] Đang equip Dragonheart..."
         EquipWeapon("Dragonheart")
         task.wait(0.8)
@@ -652,10 +621,8 @@ do
         EquipWeapon("Dragonstorm")
         task.wait(0.8)
         ActionStatus.Text = "Hành động: [3.1] ✅ Đã equip xong! Chuyển sang 3.2..."
-        warn("[DracoAuto] [3.1] Luồng 1 hoàn tất → tiếp tục 3.2!")
         task.wait(1)
     else
-        warn("[DracoAuto] [3.1] Luồng 2: Chưa có Heart/Storm → farm nguyên liệu!")
         ActionStatus.Text = "Hành động: [3.1] Chưa có Heart & Storm → farm nguyên liệu..."
         task.wait(1)
 
@@ -663,7 +630,7 @@ do
         local EMBER_MIN = 55
 
         -- ==========================================
-        -- BƯỚC A: FARM DRAGON SCALE (CHUẨN KAITUNBOSS FIX SECURITY KICK)
+        -- BƯỚC A: FARM DRAGON SCALE
         -- ==========================================
         do
             local invA, _ = GetInventory()
@@ -673,51 +640,10 @@ do
                 task.wait(0.5)
             else
                 ActionStatus.Text = "Hành động: [3.1-A] Dragon Scale thiếu (" .. scaleCount .. "/5) → Farm..."
-                warn("[DracoAuto] [3.1-A] Bắt đầu farm Dragon Scale...")
 
                 local SCALE_MOBS = {"Dragon Crew Archer", "Dragon Crew Warrior"}
                 local SCALE_POS  = CFrame.new(6594, 383, 139)
                 local _farmingScale = true
-
-                -- FIX SECURITY KICK: Logic attack của KaitunBoss
-                -- KHÔNG thao túng vật lý của quái, chỉ đứng cách 20 stud và FastAttack
-                local function SafeKillScaleMob(targetModel)
-                    xpcall(function()
-                        if not targetModel or not targetModel.Parent then return end
-                        local vh = targetModel:FindFirstChild("Humanoid")
-                        local vhrp = targetModel:FindFirstChild("HumanoidRootPart")
-                        if not vh or vh.Health <= 0 or not vhrp then return end
-
-                        local dx = HumanoidRootPart.Position.X - vhrp.Position.X
-                        local dy = HumanoidRootPart.Position.Y - vhrp.Position.Y
-                        local dz = HumanoidRootPart.Position.Z - vhrp.Position.Z
-                        local sqrMag = dx*dx + dy*dy + dz*dz
-
-                        -- Check khoảng cách <= 70 stud như KaitunBoss
-                        if sqrMag <= 4900 then
-                            EquipWeaponTool("Melee")
-                            FastAttack(targetModel.Name)
-
-                            if tick() - lastKenCall >= 10 then
-                                lastKenCall = tick()
-                                pcall(function() ReplicatedStorage.Remotes.CommE:FireServer("Ken", true) end)
-                            end
-
-                            -- Di chuyển lơ lửng an toàn cách quái 20 stud
-                            local yOffset = vhrp.Position.Y > 60 and -20 or 20
-                            local safePos = CFrame.new(vhrp.Position + (vhrp.CFrame.LookVector * 20) + Vector3.new(0, yOffset, 0), vhrp.Position)
-                            SetFloatPos(safePos)
-                        else
-                            -- Bay đến nếu xa quá
-                            TweenTo(vhrp.CFrame * CFrame.new(0, 20, 0))
-                        end
-                    end, function(e) warn("[DracoAuto] SafeKillScaleMob ERROR:", e) end)
-                end
-
-                -- Bay lơ lửng đến bãi quái
-                StartFloat()
-                TweenTo(SCALE_POS * CFrame.new(0, 30, 0))
-                SetFloatPos(SCALE_POS * CFrame.new(0, 30, 0))
 
                 while _farmingScale do
                     pcall(function()
@@ -731,30 +657,28 @@ do
                         end
 
                         local target = FindClosestMob(SCALE_MOBS)
-
                         if target then
                             EnsureBuso()
                             repeat
-                                SafeKillScaleMob(target)
-                                task.wait(0.15)
+                                SafeKillMob(target)
+                                task.wait(0.1)
                             until not _farmingScale
                                 or not target or not target.Parent
                                 or not target:FindFirstChild("Humanoid")
                                 or target.Humanoid.Health <= 0
                         else
-                            SetFloatPos(SCALE_POS * CFrame.new(0, 30, 0))
+                            SmoothTween(SCALE_POS * CFrame.new(0, 30, 0), 300)
                         end
                     end)
                     task.wait(0.2)
                 end
-
-                StopFloat()
+                
+                StopSmoothTween()
 
                 local invFinal, _ = GetInventory()
                 local _, finalScale = HasItem(invFinal, "Dragon Scale")
                 if finalScale >= SCALE_MIN then
                     ActionStatus.Text = "Hành động: [3.1-A] ✅ Đủ " .. finalScale .. "/5 Dragon Scale! Kick..."
-                    warn("[DracoAuto] [3.1-A] Đủ Dragon Scale → Kick!")
                     task.wait(2)
                     Player:Kick("\n[ Draco Auto ]\nĐủ 5/5 Dragon Scale!\nRejoin để farm Blaze Ember.")
                 end
@@ -762,7 +686,7 @@ do
         end
 
         -- ==========================================
-        -- BƯỚC B: FARM BLAZE EMBER (Auto Dragon Hunter)
+        -- BƯỚC B: FARM BLAZE EMBER
         -- ==========================================
         do
             local invB, _ = GetInventory()
@@ -772,7 +696,6 @@ do
                 task.wait(0.5)
             else
                 ActionStatus.Text = "Hành động: [3.1-B] Blaze Ember thiếu (" .. emberCount .. "/55) → Farm Dragon Hunter..."
-                warn("[DracoAuto] [3.1-B] Bắt đầu Auto Dragon Hunter...")
 
                 local DOJO_POS  = CFrame.new(5813, 1208, 884)
                 local HYDRA_POS = CFrame.new(4620.61572265625, 1002.2954711914062, 399.0868835449219)
@@ -786,9 +709,7 @@ do
                     pcall(function()
                         local Net = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
                         local RF  = Net:WaitForChild("RF/DragonHunter")
-                        pcall(function()
-                            RF:InvokeServer(unpack({[1] = {["Context"] = "RequestQuest"}}))
-                        end)
+                        pcall(function() RF:InvokeServer(unpack({[1] = {["Context"] = "RequestQuest"}})) end)
                         questData = RF:InvokeServer(unpack({[1] = {["Context"] = "Check"}}))
                     end)
 
@@ -806,7 +727,6 @@ do
                             questCount = 10
                         end
                     end
-
                     return hasQuest, mobName, questCount, questType
                 end
 
@@ -833,52 +753,21 @@ do
                     end)
                 end
 
-                -- Trình diệt quái Ember an toàn giống Scale
-                local function SafeKillEmberMob(targetModel)
-                    xpcall(function()
-                        if not targetModel or not targetModel.Parent then return end
-                        local vh = targetModel:FindFirstChild("Humanoid")
-                        local vhrp = targetModel:FindFirstChild("HumanoidRootPart")
-                        if not vh or vh.Health <= 0 or not vhrp then return end
-
-                        local dx = HumanoidRootPart.Position.X - vhrp.Position.X
-                        local dy = HumanoidRootPart.Position.Y - vhrp.Position.Y
-                        local dz = HumanoidRootPart.Position.Z - vhrp.Position.Z
-                        local sqrMag = dx*dx + dy*dy + dz*dz
-
-                        if sqrMag <= 4900 then
-                            EquipWeaponTool("Melee")
-                            FastAttack(targetModel.Name)
-
-                            if tick() - lastKenCall >= 10 then
-                                lastKenCall = tick()
-                                pcall(function() ReplicatedStorage.Remotes.CommE:FireServer("Ken", true) end)
-                            end
-
-                            local yOffset = vhrp.Position.Y > 60 and -20 or 20
-                            local safePos = CFrame.new(vhrp.Position + (vhrp.CFrame.LookVector * 20) + Vector3.new(0, yOffset, 0), vhrp.Position)
-                            SetFloatPos(safePos)
-                        else
-                            TweenTo(vhrp.CFrame * CFrame.new(0, 20, 0))
-                        end
-                    end, function(e) warn("[DracoAuto] SafeKillEmberMob ERROR:", e) end)
-                end
-
-                -- Thread phụ nhặt Ember
+                -- Luồng chuyên săn Ember rơi ra
                 task.spawn(function()
                     while _farmingEmber do
                         pcall(function()
                             if workspace:FindFirstChild("EmberTemplate") and workspace.EmberTemplate:FindFirstChild("Part") then
-                                if Character and HumanoidRootPart then
-                                    HumanoidRootPart.CFrame = workspace.EmberTemplate.Part.CFrame
+                                if Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+                                    if _tweenGhost then
+                                        _tweenGhost.CFrame = workspace.EmberTemplate.Part.CFrame
+                                    end
                                 end
                             end
                         end)
                         task.wait(0.15)
                     end
                 end)
-
-                StartFloat()
 
                 while _farmingEmber do
                     pcall(function()
@@ -901,15 +790,15 @@ do
                                     if target then
                                         EnsureBuso()
                                         repeat
-                                            SafeKillEmberMob(target)
-                                            task.wait(0.15)
+                                            SafeKillMob(target)
+                                            task.wait(0.1)
                                         until not _farmingEmber
                                             or not target or not target.Parent
                                             or not target:FindFirstChild("Humanoid")
                                             or target.Humanoid.Health <= 0
                                             or isBackToDojo()
                                     else
-                                        SetFloatPos(HYDRA_POS * CFrame.new(0, 30, 0))
+                                        SmoothTween(HYDRA_POS * CFrame.new(0, 30, 0), 300)
                                     end
                                 end
 
@@ -918,17 +807,16 @@ do
                                 pcall(function()
                                     local tree = workspace.Map.Waterfall.IslandModel:FindFirstChild("Meshes/bambootree", true)
                                     if tree then
-                                        StopFloat()
                                         TweenTo(tree.CFrame * CFrame.new(4, 0, 0))
-                                        if HumanoidRootPart and (tree.Position - HumanoidRootPart.Position).Magnitude <= 200 then
+                                        local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+                                        if hrp and (tree.Position - hrp.Position).Magnitude <= 50 then
                                             UseAllSkills()
                                         end
-                                        StartFloat()
                                     end
                                 end)
                             end
                         else
-                            StopFloat()
+                            StopSmoothTween()
                             if isBackToDojo() then
                                 TweenTo(DOJO_POS)
                                 task.wait(0.3)
@@ -938,20 +826,18 @@ do
                                 TweenTo(DOJO_POS)
                                 task.wait(0.5)
                             end
-                            StartFloat()
                         end
                     end)
                     task.wait(0.2)
                 end
 
-                StopFloat()
+                StopSmoothTween()
                 _farmingEmber = false
 
                 local invFinal, _ = GetInventory()
                 local _, finalEmber = HasItem(invFinal, "Blaze Ember")
                 if finalEmber >= EMBER_MIN then
                     ActionStatus.Text = "Hành động: [3.1-B] ✅ Đủ " .. finalEmber .. "/55 Blaze Ember! Kick..."
-                    warn("[DracoAuto] [3.1-B] Đủ Blaze Ember → Kick!")
                     task.wait(2)
                     Player:Kick("\n[ Draco Auto ]\nĐủ 55/55 Blaze Ember!\nRejoin để Craft Heart & Storm.")
                 end
@@ -966,14 +852,12 @@ end
 -- ==========================================
 -- [ 3.2 ] AUTO CRAFT DRAGONHEART & DRAGONSTORM
 -- ==========================================
-
 do
     local invC, _ = GetInventory()
     local hasHeartNow, _ = HasItem(invC, "Dragonheart")
     local hasStormNow, _ = HasItem(invC, "Dragonstorm")
 
-    WeaponRowLabel.Text = string.format("Heart: %s  |  Storm: %s",
-        hasHeartNow and "✅" or "❌", hasStormNow and "✅" or "❌")
+    WeaponRowLabel.Text = string.format("Heart: %s  |  Storm: %s", hasHeartNow and "✅" or "❌", hasStormNow and "✅" or "❌")
 
     if hasHeartNow and hasStormNow then
         ActionStatus.Text = "Hành động: [3.2] Đã có Heart + Storm, bỏ qua craft!"
@@ -1026,8 +910,7 @@ do
                 local invAfter, _ = GetInventory()
                 local heartAfter, _ = HasItem(invAfter, "Dragonheart")
                 local stormAfter, _ = HasItem(invAfter, "Dragonstorm")
-                WeaponRowLabel.Text = string.format("Heart: %s  |  Storm: %s",
-                    heartAfter and "✅" or "❌", stormAfter and "✅" or "❌")
+                WeaponRowLabel.Text = string.format("Heart: %s  |  Storm: %s", heartAfter and "✅" or "❌", stormAfter and "✅" or "❌")
 
                 if heartAfter and stormAfter then
                     ActionStatus.Text = "Hành động: [3.2] ✅ Craft xong! Kick..."
@@ -1046,7 +929,6 @@ end
 -- ==========================================
 -- [ 3.3 ] CHECK RACE DRACO & AUTO ĐỔI RACE
 -- ==========================================
-
 do
     local function GetDragonRace()
         local raceStr = "Unknown"
@@ -1081,13 +963,7 @@ do
             RF:InvokeServer(unpack({[1]={NPC="Dragon Wizard",Command="DragonRace"}}))
             success = true
         end)
-        if ok and success then
-            warn("[DracoAuto] [3.3] DoChangeRace: Thành công!")
-            return true
-        else
-            warn("[DracoAuto] [3.3] DoChangeRace: Thất bại!", err)
-            return false
-        end
+        if ok and success then return true else return false end
     end
 
     local currentRace = GetDragonRace()
@@ -1128,7 +1004,6 @@ end
 -- ==========================================
 -- [ 3.4 ] FARM MASTERY DRAGONHEART & DRAGONSTORM
 -- ==========================================
-
 do
     local STAT_MAX    = 2800
     local MASTERY_MAX = 500
@@ -1136,19 +1011,14 @@ do
 
     local function ResetStat()
         ActionStatus.Text = "Hành động: [3.4] Đang reset stat..."
-        warn("[DracoAuto] [3.4] ResetStat: Bắt đầu refund...")
         pcall(function() CommF:InvokeServer("BlackbeardReward", "Refund", "1") end)
         task.wait(0.3)
         pcall(function() CommF:InvokeServer("BlackbeardReward", "Refund", "2") end)
         task.wait(0.5)
-        warn("[DracoAuto] [3.4] ResetStat: Hoàn tất!")
     end
 
     local function AddStatPoint(statName, amount)
-        pcall(function()
-            CommF:InvokeServer("AddPoint", statName, amount)
-        end)
-        warn("[DracoAuto] [3.4] AddStatPoint: " .. statName .. " +" .. amount)
+        pcall(function() CommF:InvokeServer("AddPoint", statName, amount) end)
     end
 
     local function IsStatCorrect(buildType)
@@ -1171,51 +1041,33 @@ do
     local stormMastery = GetWeaponMastery("Dragonstorm")
 
     MasteryLabel.Text = string.format("Mastery: Heart %d/500 | Storm %d/500", heartMastery, stormMastery)
-    warn("[DracoAuto] [3.4] HeartMastery=" .. heartMastery .. " StormMastery=" .. stormMastery)
 
-    -- ==========================================
     -- LUỒNG 1: DRAGONHEART (SWORD) MASTERY < 500
-    -- ==========================================
     if heartMastery < MASTERY_MAX then
-        warn("[DracoAuto] [3.4-L1] Heart mastery " .. heartMastery .. " < 500 → Farm Sword mastery!")
         ActionStatus.Text = "Hành động: [3.4-L1] Heart mastery " .. heartMastery .. "/500 → Kiểm tra stat Sword build..."
 
         if IsStatCorrect("Sword") then
             ActionStatus.Text = "Hành động: [3.4-L1] ✅ Stat đã đúng Sword build, giữ nguyên!"
-            warn("[DracoAuto] [3.4-L1] Stat đã đúng Melee/Defense/Sword → giữ nguyên!")
             task.wait(1)
         else
-            warn("[DracoAuto] [3.4-L1] Stat sai → delay 5s rồi reset!")
             for i = 5, 1, -1 do
                 ActionStatus.Text = "Hành động: [3.4-L1] Stat chưa đúng! Reset sau " .. i .. "s..."
                 task.wait(1)
             end
-
             ResetStat()
             task.wait(0.5)
-
             ActionStatus.Text = "Hành động: [3.4-L1] Nâng Melee → " .. STAT_MAX .. "..."
             AddStatPoint("Melee", STAT_MAX)
             task.wait(0.3)
-
             ActionStatus.Text = "Hành động: [3.4-L1] Nâng Defense → " .. STAT_MAX .. "..."
             AddStatPoint("Defense", STAT_MAX)
             task.wait(0.3)
-
             ActionStatus.Text = "Hành động: [3.4-L1] Nâng Sword → " .. STAT_MAX .. "..."
             AddStatPoint("Sword", STAT_MAX)
             task.wait(0.3)
-
-            ActionStatus.Text = "Hành động: [3.4-L1] ✅ Hoàn tất Sword build!"
-            warn("[DracoAuto] [3.4-L1] Xong reset + nâng Melee/Defense/Sword = " .. STAT_MAX)
         end
 
-        ActionStatus.Text = "Hành động: [3.4-L1] Load farm Sword mastery sau 4s..."
-        task.wait(4)
-
-        warn("[DracoAuto] [3.4-L1] Load BananaHub HeartMastery...")
         ActionStatus.Text = "Hành động: [3.4-L1] Đang load BananaHub farm Heart (Sword) mastery..."
-
         LoadBananaHub({
             ["Select Weapon"]      = "Sword",
             ["Select Method Farm"] = "Farm Bones",
@@ -1226,80 +1078,51 @@ do
             task.wait(10)
             heartMastery = GetWeaponMastery("Dragonheart")
             MasteryLabel.Text = string.format("Mastery: Heart %d/500 | Storm %d/500", heartMastery, stormMastery)
-            MasteryLabel.TextColor3 = heartMastery >= MASTERY_MAX
-                and Color3.fromRGB(0, 255, 0)
-                or  Color3.fromRGB(255, 200, 0)
+            MasteryLabel.TextColor3 = heartMastery >= MASTERY_MAX and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 200, 0)
             ActionStatus.Text = string.format("Hành động: [3.4-L1] Đang farm Heart mastery (%d/500)...", heartMastery)
-            warn("[DracoAuto] [3.4-L1] Heart mastery: " .. heartMastery)
         until heartMastery >= MASTERY_MAX
 
         ActionStatus.Text = "Hành động: [3.4-L1] ✅ Heart mastery đạt " .. heartMastery .. "/500! Kick..."
-        warn("[DracoAuto] [3.4-L1] Heart mastery đủ 500 → Kick!")
         task.wait(2)
         Player:Kick("\n[ Draco Auto ]\nDragonheart đạt " .. heartMastery .. "/500 Mastery!\nRejoin để farm Dragonstorm mastery.")
 
-    -- ==========================================
     -- LUỒNG 2: HEART >= 500 → FARM DRAGONSTORM (GUN) MASTERY
-    -- ==========================================
     else
-        warn("[DracoAuto] [3.4-L2] Heart mastery " .. heartMastery .. " >= 500 → Check Storm!")
-
         stormMastery = GetWeaponMastery("Dragonstorm")
         MasteryLabel.Text = string.format("Mastery: Heart %d/500 | Storm %d/500", heartMastery, stormMastery)
 
         if stormMastery >= MASTERY_MAX then
             ActionStatus.Text = "Hành động: [3.4-L2] ✅ Cả Heart + Storm đều đủ 500!"
-            warn("[DracoAuto] [3.4-L2] Cả hai đã đủ mastery → Ghi file + kick!")
-
             pcall(function() writefile(Player.Name .. ".txt", "Completed-mastery") end)
-            warn("[DracoAuto] [3.4-L2] Đã ghi file " .. Player.Name .. ".txt → Completed-mastery")
-
             for i = 10, 1, -1 do
                 ActionStatus.Text = "Hành động: [3.4-L2] ✅ HOÀN THÀNH! Kick sau " .. i .. "s..."
                 task.wait(1)
             end
             Player:Kick("\n[ Draco Auto ]\n✅ HOÀN THÀNH!\nHeart: " .. heartMastery .. "/500 | Storm: " .. stormMastery .. "/500\nFile " .. Player.Name .. ".txt đã ghi.")
-
         else
-            warn("[DracoAuto] [3.4-L2] Storm mastery " .. stormMastery .. " < 500 → Farm Gun mastery!")
             ActionStatus.Text = "Hành động: [3.4-L2] Storm mastery " .. stormMastery .. "/500 → Kiểm tra stat Gun build..."
-
             if IsStatCorrect("Gun") then
                 ActionStatus.Text = "Hành động: [3.4-L2] ✅ Stat đã đúng Gun build, giữ nguyên!"
-                warn("[DracoAuto] [3.4-L2] Stat đã đúng Melee/Defense/Gun → giữ nguyên!")
                 task.wait(1)
             else
-                warn("[DracoAuto] [3.4-L2] Stat sai → delay 5s rồi reset!")
                 for i = 5, 1, -1 do
                     ActionStatus.Text = "Hành động: [3.4-L2] Stat chưa đúng! Reset sau " .. i .. "s..."
                     task.wait(1)
                 end
-
                 ResetStat()
                 task.wait(0.5)
-
                 ActionStatus.Text = "Hành động: [3.4-L2] Nâng Melee → " .. STAT_MAX .. "..."
                 AddStatPoint("Melee", STAT_MAX)
                 task.wait(0.3)
-
                 ActionStatus.Text = "Hành động: [3.4-L2] Nâng Defense → " .. STAT_MAX .. "..."
                 AddStatPoint("Defense", STAT_MAX)
                 task.wait(0.3)
-
                 ActionStatus.Text = "Hành động: [3.4-L2] Nâng Gun → " .. STAT_MAX .. "..."
                 AddStatPoint("Gun", STAT_MAX)
                 task.wait(0.3)
-
-                ActionStatus.Text = "Hành động: [3.4-L2] ✅ Hoàn tất Gun build!"
-                warn("[DracoAuto] [3.4-L2] Xong reset + nâng Melee/Defense/Gun = " .. STAT_MAX)
             end
 
-            ActionStatus.Text = "Hành động: [3.4-L2] Load farm Storm (Gun) mastery sau 4s..."
-            task.wait(4)
-
-            warn("[DracoAuto] [3.4-L2] Load BananaHub StormMastery...")
             ActionStatus.Text = "Hành động: [3.4-L2] Đang load BananaHub farm Storm (Gun) mastery..."
-
             LoadBananaHub({
                 ["Select Weapon"]              = "Melee",
                 ["Select Method Farm"]         = "Farm Bones",
@@ -1313,20 +1136,12 @@ do
                 task.wait(10)
                 stormMastery = GetWeaponMastery("Dragonstorm")
                 MasteryLabel.Text = string.format("Mastery: Heart %d/500 | Storm %d/500", heartMastery, stormMastery)
-                MasteryLabel.TextColor3 = stormMastery >= MASTERY_MAX
-                    and Color3.fromRGB(0, 255, 0)
-                    or  Color3.fromRGB(255, 200, 0)
+                MasteryLabel.TextColor3 = stormMastery >= MASTERY_MAX and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 200, 0)
                 ActionStatus.Text = string.format("Hành động: [3.4-L2] Đang farm Storm mastery (%d/500)...", stormMastery)
-                warn("[DracoAuto] [3.4-L2] Storm mastery: " .. stormMastery)
             until stormMastery >= MASTERY_MAX
 
             ActionStatus.Text = "Hành động: [3.4-L2] ✅ Storm mastery đạt " .. stormMastery .. "/500! Ghi file..."
-            warn("[DracoAuto] [3.4-L2] Storm mastery đủ 500 → Ghi file!")
-
             pcall(function() writefile(Player.Name .. ".txt", "Completed-mastery") end)
-            warn("[DracoAuto] [3.4-L2] Đã ghi file " .. Player.Name .. ".txt → Completed-mastery")
-
-            ActionStatus.Text = "Hành động: [3.4-L2] ✅ Đã ghi file! Kick sau 10s..."
             for i = 10, 1, -1 do
                 ActionStatus.Text = "Hành động: [3.4-L2] ✅ HOÀN THÀNH! Kick sau " .. i .. "s..."
                 task.wait(1)
