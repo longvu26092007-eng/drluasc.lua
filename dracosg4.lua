@@ -63,7 +63,7 @@ Player.CharacterAdded:Connect(function(v)
 end)
 
 -- ==========================================
--- [ 1.1 ] HỆ THỐNG DI CHUYỂN BÓNG (CHUẨN KAITUNBOSS)
+-- [ 1.1 ] HỆ THỐNG DI CHUYỂN BÓNG (TWEEN)
 -- Fix hoàn toàn lỗi giật tại chỗ
 -- ==========================================
 local _tweenGhost = nil
@@ -76,7 +76,6 @@ local function SmoothTween(targetCFrame, speed)
     if not char or not char:FindFirstChild("HumanoidRootPart") then return end
     local hrp = char.HumanoidRootPart
 
-    -- Tạo bóng (Ghost) nếu chưa có
     if not _tweenGhost or not _tweenGhost.Parent then
         _tweenGhost = Instance.new("Part")
         _tweenGhost.Name         = "DracoGhost"
@@ -93,7 +92,6 @@ local function SmoothTween(targetCFrame, speed)
     local dist = (targetCFrame.Position - _tweenGhost.Position).Magnitude
     local timeToTween = dist / speed
 
-    -- Tween bóng đi cực mượt
     if dist > 5000 then
         _tweenGhost.CFrame = targetCFrame
     else
@@ -101,7 +99,6 @@ local function SmoothTween(targetCFrame, speed)
         _tweenObj:Play()
     end
 
-    -- Khóa chặt người chơi vào bóng mỗi khung hình
     if not _tweenConn then
         _tweenConn = RunService.Heartbeat:Connect(function()
             pcall(function()
@@ -132,7 +129,6 @@ local function StopSmoothTween()
     end)
 end
 
--- Tween có chờ đến nơi
 local function TweenTo(targetCFrame, speed)
     local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
     if not hrp then return false end
@@ -148,7 +144,7 @@ local function TweenTo(targetCFrame, speed)
 end
 
 -- ==========================================
--- [ PHẦN 1.3 ] HỆ THỐNG ATTACK VÀ BRING MOB
+-- [ PHẦN 1.3 ] HỆ THỐNG ATTACK
 -- ==========================================
 local COMMF_ = ReplicatedStorage:WaitForChild("Remotes") and ReplicatedStorage.Remotes:WaitForChild("CommF_")
 local remoteAttack, idremote
@@ -194,9 +190,12 @@ local function FastAttack(x)
     end
     n:FindFirstChild("RE/RegisterAttack"):FireServer()
     n:FindFirstChild("RE/RegisterHit"):FireServer(unpack(h))
-    cloneref(remoteAttack):FireServer(string.gsub("RE/RegisterHit", ".", function(c)
+    
+    local attackRemote = typeof(cloneref) == "function" and cloneref(remoteAttack) or remoteAttack
+    attackRemote:FireServer(string.gsub("RE/RegisterHit", ".", function(c)
         return string.char(bit32.bxor(string.byte(c), math.floor(workspace:GetServerTimeNow() / 10 % 10) + 1))
     end), bit32.bxor(idremote + 909090, seed * 2), unpack(h))
+    
     lastCallFA = tick()
 end
 
@@ -245,7 +244,8 @@ local function EnsureBuso()
 end
 
 -- ==========================================
--- HÀM ATTACK + BRING MOB (TÍCH HỢP GOM QUÁI)
+-- HÀM ATTACK + BRING MOB (GOM QUÁI XỊN)
+-- Đã fix: không xóa animator, tự lấy simulation radius
 -- ==========================================
 local function SafeKillMob(targetModel)
     xpcall(function()
@@ -257,55 +257,58 @@ local function SafeKillMob(targetModel)
         local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
 
-        -- Khóa vị trí quái vật mục tiêu
-        if not targetModel:GetAttribute("Locked") then
-            targetModel:SetAttribute("Locked", vhrp.CFrame)
-        end
-        local lockedPos = targetModel:GetAttribute("Locked").Position
-        local lockedCFrame = CFrame.new(lockedPos)
-
-        -- TÍCH HỢP BRING MOB: Gom những con quái cùng tên vào chung một điểm
+        -- 1. Giành quyền vật lý (chống giật quái về chỗ cũ)
         pcall(function()
-            local targetName = targetModel.Name
+            if setsimulationradius then setsimulationradius(math.huge, math.huge) end
+            if sethiddenproperty then sethiddenproperty(Player, "SimulationRadius", math.huge) end
+            Player.SimulationRadius = math.huge
+        end)
+
+        local targetName = targetModel.Name
+        local centerCFrame = vhrp.CFrame
+
+        -- 2. HÚT QUÁI (Bring)
+        pcall(function()
             for _, enemy in pairs(workspace.Enemies:GetChildren()) do
                 local eh = enemy:FindFirstChild("Humanoid")
                 local ehrp = enemy:FindFirstChild("HumanoidRootPart")
-                if eh and eh.Health > 0 and ehrp then
-                    -- Hút quái cùng tên trong phạm vi 350 stud
-                    if enemy.Name == targetName and (ehrp.Position - lockedPos).Magnitude <= 350 then
-                        ehrp.CFrame = lockedCFrame
+                if eh and eh.Health > 0 and ehrp and enemy.Name == targetName and enemy ~= targetModel then
+                    if (ehrp.Position - centerCFrame.Position).Magnitude <= 350 then
+                        ehrp.CFrame = centerCFrame
                         ehrp.CanCollide = false
                         eh.WalkSpeed = 0
                         eh.JumpPower = 0
-                        if eh:FindFirstChild("Animator") then
-                            eh.Animator:Destroy()
-                        end
+                        eh:ChangeState(11) -- Stun (tránh nó tự di chuyển)
+                        
+                        -- Xóa lực đẩy nếu có
+                        if ehrp:FindFirstChild("BodyVelocity") then ehrp.BodyVelocity:Destroy() end
                     end
                 end
             end
         end)
 
-        local dx = hrp.Position.X - lockedPos.X
-        local dy = hrp.Position.Y - lockedPos.Y
-        local dz = hrp.Position.Z - lockedPos.Z
+        local dx = hrp.Position.X - centerCFrame.Position.X
+        local dy = hrp.Position.Y - centerCFrame.Position.Y
+        local dz = hrp.Position.Z - centerCFrame.Position.Z
         local sqrMag = dx*dx + dy*dy + dz*dz
 
-        -- Đánh quái khi ở gần
-        if sqrMag <= 4900 then
+        -- 3. Check tầm đánh & Tấn Công
+        if sqrMag <= 4900 then -- Bán kính 70 studs
             EquipWeaponTool("Melee")
-            FastAttack(targetModel.Name)
+            FastAttack(targetName)
 
             if tick() - lastKenCall >= 10 then
                 lastKenCall = tick()
                 pcall(function() ReplicatedStorage.Remotes.CommE:FireServer("Ken", true) end)
             end
 
-            local yOffset = lockedPos.Y > 60 and -20 or 20
-            local attackPos = CFrame.new(lockedPos + Vector3.new(0, yOffset, 0), lockedPos)
+            -- Bay cao 20 studs & Chĩa mặt xuống quái
+            local attackPos = CFrame.new(centerCFrame.Position + Vector3.new(0, 20, 0), centerCFrame.Position)
             SmoothTween(attackPos, 350)
         else
-            -- Lướt tới nếu ở xa
-            SmoothTween(lockedCFrame * CFrame.new(0, 20, 0), 350)
+            -- Lướt lại gần nếu còn xa
+            local approachPos = CFrame.new(centerCFrame.Position + Vector3.new(0, 20, 0), centerCFrame.Position)
+            SmoothTween(approachPos, 350)
         end
     end, function(e) warn("[DracoAuto] SafeKillMob ERROR:", e) end)
 end
@@ -688,7 +691,7 @@ do
                             EnsureBuso()
                             repeat
                                 SafeKillMob(target)
-                                task.wait(0.1)
+                                task.wait(0.15) -- Delay an toàn
                             until not _farmingScale
                                 or not target or not target.Parent
                                 or not target:FindFirstChild("Humanoid")
@@ -818,7 +821,7 @@ do
                                         EnsureBuso()
                                         repeat
                                             SafeKillMob(target)
-                                            task.wait(0.1)
+                                            task.wait(0.15)
                                         until not _farmingEmber
                                             or not target or not target.Parent
                                             or not target:FindFirstChild("Humanoid")
