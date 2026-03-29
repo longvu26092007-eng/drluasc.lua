@@ -740,8 +740,8 @@ do
             end
         end
 
-        -- ==========================================
-        -- BƯỚC B: FARM BLAZE EMBER
+-- ==========================================
+        -- BƯỚC B: FARM BLAZE EMBER (Auto Dragon Hunter)
         -- ==========================================
         do
             local invB, _ = GetInventory()
@@ -756,6 +756,7 @@ do
                 local HYDRA_POS = CFrame.new(4620.61572265625, 1002.2954711914062, 399.0868835449219)
                 local _farmingEmber = true
 
+                -- 1. Hàm kiểm tra thông tin Quest Dragon Hunter
                 local function checkDragonQuest()
                     local questData = nil
                     local hasQuest  = false
@@ -785,6 +786,7 @@ do
                     return hasQuest, mobName, questCount, questType
                 end
 
+                -- 2. Hàm kiểm tra xem đã xong và cần quay về Dojo chưa
                 local function isBackToDojo()
                     local result = false
                     pcall(function()
@@ -799,6 +801,7 @@ do
                     return result
                 end
 
+                -- 3. Hàm Claim Quest ở Dojo Trainer
                 local function claimDragonQuest()
                     pcall(function()
                         local Net = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
@@ -808,13 +811,14 @@ do
                     end)
                 end
 
-                -- Luồng chuyên săn Ember rơi ra
+                -- 4. Luồng chạy ngầm chuyên săn Ember rớt ra trên map
                 task.spawn(function()
                     while _farmingEmber do
                         pcall(function()
                             if workspace:FindFirstChild("EmberTemplate") and workspace.EmberTemplate:FindFirstChild("Part") then
                                 if Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
                                     if _tweenGhost then
+                                        -- Cập nhật CFrame bóng để player tự tele theo ăn Ember
                                         _tweenGhost.CFrame = workspace.EmberTemplate.Part.CFrame
                                     end
                                 end
@@ -824,6 +828,7 @@ do
                     end
                 end)
 
+                -- Bắt đầu Loop Farm
                 while _farmingEmber do
                     pcall(function()
                         local invLoop, _ = GetInventory()
@@ -845,6 +850,7 @@ do
                                     if target then
                                         EnsureBuso()
                                         repeat
+                                            -- Đã cập nhật truyền Array {mobName} để gom quái giống Dragon Scale
                                             SafeKillMob(target, {mobName})
                                             task.wait(0.15)
                                         until not _farmingEmber
@@ -871,6 +877,7 @@ do
                                 end)
                             end
                         else
+                            -- Không có quest / Cần quay về Dojo -> Ngắt lơ lửng -> Tween Về -> Nhận -> Bật lơ lửng lại
                             StopSmoothTween()
                             if isBackToDojo() then
                                 TweenTo(DOJO_POS)
