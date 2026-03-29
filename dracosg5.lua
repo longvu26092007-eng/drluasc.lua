@@ -148,7 +148,7 @@ local function TweenTo(targetCFrame, speed)
 end
 
 -- ==========================================
--- [ PHẦN 1.3 ] HỆ THỐNG ATTACK (từ KaitunBoss)
+-- [ PHẦN 1.3 ] HỆ THỐNG ATTACK VÀ BRING MOB
 -- ==========================================
 local COMMF_ = ReplicatedStorage:WaitForChild("Remotes") and ReplicatedStorage.Remotes:WaitForChild("CommF_")
 local remoteAttack, idremote
@@ -245,7 +245,7 @@ local function EnsureBuso()
 end
 
 -- ==========================================
--- HÀM ATTACK AN TOÀN CHUẨN KAITUNBOSS
+-- HÀM ATTACK + BRING MOB (TÍCH HỢP GOM QUÁI)
 -- ==========================================
 local function SafeKillMob(targetModel)
     xpcall(function()
@@ -257,12 +257,40 @@ local function SafeKillMob(targetModel)
         local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
 
-        local dx = hrp.Position.X - vhrp.Position.X
-        local dy = hrp.Position.Y - vhrp.Position.Y
-        local dz = hrp.Position.Z - vhrp.Position.Z
+        -- Khóa vị trí quái vật mục tiêu
+        if not targetModel:GetAttribute("Locked") then
+            targetModel:SetAttribute("Locked", vhrp.CFrame)
+        end
+        local lockedPos = targetModel:GetAttribute("Locked").Position
+        local lockedCFrame = CFrame.new(lockedPos)
+
+        -- TÍCH HỢP BRING MOB: Gom những con quái cùng tên vào chung một điểm
+        pcall(function()
+            local targetName = targetModel.Name
+            for _, enemy in pairs(workspace.Enemies:GetChildren()) do
+                local eh = enemy:FindFirstChild("Humanoid")
+                local ehrp = enemy:FindFirstChild("HumanoidRootPart")
+                if eh and eh.Health > 0 and ehrp then
+                    -- Hút quái cùng tên trong phạm vi 350 stud
+                    if enemy.Name == targetName and (ehrp.Position - lockedPos).Magnitude <= 350 then
+                        ehrp.CFrame = lockedCFrame
+                        ehrp.CanCollide = false
+                        eh.WalkSpeed = 0
+                        eh.JumpPower = 0
+                        if eh:FindFirstChild("Animator") then
+                            eh.Animator:Destroy()
+                        end
+                    end
+                end
+            end
+        end)
+
+        local dx = hrp.Position.X - lockedPos.X
+        local dy = hrp.Position.Y - lockedPos.Y
+        local dz = hrp.Position.Z - lockedPos.Z
         local sqrMag = dx*dx + dy*dy + dz*dz
 
-        -- Check khoảng cách an toàn (<= 70) như KaitunBoss
+        -- Đánh quái khi ở gần
         if sqrMag <= 4900 then
             EquipWeaponTool("Melee")
             FastAttack(targetModel.Name)
@@ -272,13 +300,12 @@ local function SafeKillMob(targetModel)
                 pcall(function() ReplicatedStorage.Remotes.CommE:FireServer("Ken", true) end)
             end
 
-            -- Canh độ cao tự động (nếu quái thấp thì bay lên 20, cao thì chui xuống -20)
-            local yOffset = vhrp.Position.Y > 60 and -20 or 20
-            local attackPos = CFrame.new(vhrp.Position + (vhrp.CFrame.LookVector * 20) + Vector3.new(0, yOffset, 0), vhrp.Position)
+            local yOffset = lockedPos.Y > 60 and -20 or 20
+            local attackPos = CFrame.new(lockedPos + Vector3.new(0, yOffset, 0), lockedPos)
             SmoothTween(attackPos, 350)
         else
-            -- Nếu xa thì lướt tới gần
-            SmoothTween(vhrp.CFrame * CFrame.new(0, 20, 0), 350)
+            -- Lướt tới nếu ở xa
+            SmoothTween(lockedCFrame * CFrame.new(0, 20, 0), 350)
         end
     end, function(e) warn("[DracoAuto] SafeKillMob ERROR:", e) end)
 end
