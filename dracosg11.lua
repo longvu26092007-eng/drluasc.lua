@@ -201,12 +201,11 @@ local function KillMonster(x)
                             lastKenCall = tick()
                             ReplicatedStorage.Remotes.CommE:FireServer("Ken", true)
                         end
-                        HumanoidRootPart.CFrame =
-                            CFrame.new(vhrp.Position + (vhrp.CFrame.LookVector * 20) + Vector3.new(0, vhrp.Position.Y > 60 and -20 or 20, 0))
+                        TweenTo(CFrame.new(vhrp.Position + (vhrp.CFrame.LookVector * 20) + Vector3.new(0, vhrp.Position.Y > 60 and -20 or 20, 0)))
                         EquipWeaponTool("Melee")
                         return
                     end
-                    HumanoidRootPart.CFrame = vhrp.CFrame
+                    TweenTo(vhrp.CFrame)
                     return
                 end
             end
@@ -214,7 +213,7 @@ local function KillMonster(x)
         for _, v in next, ReplicatedStorage:GetChildren() do
             local vhrp = v:FindFirstChild("HumanoidRootPart")
             if v:IsA("Model") and vhrp and v.Name == x then
-                HumanoidRootPart.CFrame = vhrp.CFrame
+                TweenTo(vhrp.CFrame)
                 return
             end
         end
@@ -629,10 +628,10 @@ do
                             if foundMob then break end
                         end
 
-                        -- Không tìm thấy mob → teleport đến vị trí spawn
+                        -- Không tìm thấy mob → tween đến vị trí spawn
                         if not foundMob then
                             if HumanoidRootPart then
-                                HumanoidRootPart.CFrame = SCALE_POS
+                                TweenTo(SCALE_POS)
                             end
                         end
                     end)
@@ -737,7 +736,7 @@ do
                         pcall(function()
                             if workspace:FindFirstChild("EmberTemplate") and workspace.EmberTemplate:FindFirstChild("Part") then
                                 if Character and HumanoidRootPart then
-                                    HumanoidRootPart.CFrame = workspace.EmberTemplate.Part.CFrame
+                                    TweenTo(workspace.EmberTemplate.Part.CFrame)
                                 end
                             end
                         end)
@@ -775,8 +774,8 @@ do
                                             break
                                         end
                                     end
-                                    if not foundMob and HumanoidRootPart then
-                                        HumanoidRootPart.CFrame = HYDRA_POS
+                                    if not foundMob then
+                                        TweenTo(HYDRA_POS)
                                     end
                                 end
 
@@ -784,8 +783,8 @@ do
                             elseif questType == 2 then
                                 pcall(function()
                                     local tree = workspace.Map.Waterfall.IslandModel:FindFirstChild("Meshes/bambootree", true)
-                                    if tree and HumanoidRootPart then
-                                        HumanoidRootPart.CFrame = tree.CFrame * CFrame.new(4, 0, 0)
+                                    if tree then
+                                        TweenTo(tree.CFrame * CFrame.new(4, 0, 0))
                                         if (tree.Position - HumanoidRootPart.Position).Magnitude <= 200 then
                                             FastAttack()
                                         end
@@ -798,9 +797,7 @@ do
                                 claimDragonQuest()
                                 task.wait(0.5)
                             end
-                            if HumanoidRootPart then
-                                HumanoidRootPart.CFrame = DOJO_POS
-                            end
+                                TweenTo(DOJO_POS)
                         end
                     end)
                     task.wait(0.3)
