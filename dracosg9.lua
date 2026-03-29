@@ -203,28 +203,46 @@ local function BringEnemy(centerPos)
     end)
 end
 
--- Anti-Gravity: giữ nhân vật lơ lửng liên tục, không bị rơi
-local _antiGravConn = nil
-local function StartAntiGravity()
-    if _antiGravConn then return end -- đã bật rồi
-    _antiGravConn = RunService.Heartbeat:Connect(function()
+-- ==========================================
+-- Ghost Float System (KaitunBoss TweenGhost pattern)
+-- Part ẩn Anchored 50x50x50, Heartbeat mỗi frame lock player → không rơi
+-- ==========================================
+local _floatGhost = nil     -- Part anchored ẩn
+local _floatConn  = nil     -- Heartbeat connection
+
+local function StartFloat()
+    if _floatConn then return end
+
+    -- Tạo ghost part giống KaitunBoss: Anchored, 50x50x50, ẩn
+    if not _floatGhost or not _floatGhost.Parent then
+        _floatGhost = Instance.new("Part")
+        _floatGhost.Name         = "DracoFloatGhost"
+        _floatGhost.Transparency = 1
+        _floatGhost.Anchored     = true
+        _floatGhost.CanCollide   = false
+        _floatGhost.Size         = Vector3.new(50, 50, 50)
+        _floatGhost.Parent       = workspace
+        if HumanoidRootPart then
+            _floatGhost.CFrame = HumanoidRootPart.CFrame
+        end
+    end
+
+    -- Heartbeat: MỖI FRAME lock player CFrame = ghost CFrame (KaitunBoss cách làm)
+    _floatConn = RunService.Heartbeat:Connect(function()
         pcall(function()
             local chr = Player.Character
             if not chr then return end
             local hrp = chr:FindFirstChild("HumanoidRootPart")
             local hum = chr:FindFirstChild("Humanoid")
             if not hrp or not hum or hum.Health <= 0 then return end
-            -- Giữ lơ lửng bằng BodyVelocity
-            local bv = hrp:FindFirstChild("DracoFloat")
-            if not bv then
-                bv = Instance.new("BodyVelocity")
-                bv.Name = "DracoFloat"
-                bv.MaxForce = Vector3.new(0, math.huge, 0)
-                bv.Velocity = Vector3.new(0, 0, 0)
-                bv.Parent = hrp
+
+            -- Lock CFrame mỗi frame → player dính ghost, không rơi
+            if _floatGhost and _floatGhost.Parent then
+                hrp.CFrame = _floatGhost.CFrame
             end
+
             -- Noclip
-            hum:ChangeState(11)
+            hum.Sit = false
             for _, part in pairs(chr:GetDescendants()) do
                 if part:IsA("BasePart") and part.CanCollide then
                     part.CanCollide = false
@@ -234,21 +252,28 @@ local function StartAntiGravity()
     end)
 end
 
-local function StopAntiGravity()
-    if _antiGravConn then
-        _antiGravConn:Disconnect()
-        _antiGravConn = nil
+-- Di chuyển ghost → player tự bay theo mỗi frame
+local function SetFloatPos(cf)
+    if _floatGhost and _floatGhost.Parent then
+        _floatGhost.CFrame = cf
     end
+end
+
+local function StopFloat()
+    if _floatConn then _floatConn:Disconnect(); _floatConn = nil end
+    pcall(function()
+        if _floatGhost and _floatGhost.Parent then _floatGhost:Destroy() end
+        _floatGhost = nil
+    end)
     pcall(function()
         local chr = Player.Character
-        if chr and chr:FindFirstChild("HumanoidRootPart") then
-            local bv = chr.HumanoidRootPart:FindFirstChild("DracoFloat")
-            if bv then bv:Destroy() end
+        if chr and chr:FindFirstChild("Humanoid") then
+            chr.Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
         end
     end)
 end
 
--- Tìm mob gần nhất trong danh sách tên (không chỉ con đầu tiên)
+-- Tìm mob gần nhất trong danh sách tên
 local function FindClosestMob(mobNames)
     local closest = nil
     local closestDist = math.huge
@@ -273,7 +298,8 @@ local function FindClosestMob(mobNames)
 end
 
 local lastKenCall = tick()
--- KillMonster: bay trên đầu 1 con mob cụ thể, đánh nó (1 tick)
+-- KillMonster: bay trên đầu 1 con mob, đánh nó (gọi mỗi tick trong repeat loop)
+-- SetFloatPos di chuyển ghost → Heartbeat giữ player ở đó liên tục
 local function KillMonster(targetModel)
     xpcall(function()
         if not targetModel or not targetModel.Parent then return end
@@ -287,8 +313,13 @@ local function KillMonster(targetModel)
         end
         local lockedPos = targetModel:GetAttribute("Locked").Position
 
-        -- BringEnemy + FastAttack
+        -- BringEnemy: kéo mob về, freeze
         BringEnemy(lockedPos)
+
+        -- Di chuyển ghost trên đầu mob 30 stud → Heartbeat lock player theo
+        SetFloatPos(vhrp.CFrame * CFrame.new(0, 30, 0) * CFrame.Angles(0, math.rad(180), 0))
+
+        -- Equip + FastAttack (KaitunBoss encrypted)
         EquipWeaponTool("Melee")
         FastAttack(targetModel.Name)
 
@@ -298,18 +329,7 @@ local function KillMonster(targetModel)
             pcall(function() ReplicatedStorage.Remotes.CommE:FireServer("Ken", true) end)
         end
 
-        -- Bay trên đầu mob 30 stud (set CFrame trực tiếp vì đã có AntiGravity giữ)
-        HumanoidRootPart.CFrame = vhrp.CFrame * CFrame.new(0, 30, 0) * CFrame.Angles(0, math.rad(180), 0)
-
     end, function(e) warn("[DracoAuto] KillMonster ERROR:", e) end)
-end
-
--- KillMonsterByName: tìm mob theo tên rồi gọi KillMonster (dùng cho Dragon Hunter)
-local function KillMonsterByName(mobName)
-    local target = FindClosestMob({mobName})
-    if target then
-        KillMonster(target)
-    end
 end
 
 local function EnsureBuso()
@@ -715,10 +735,11 @@ do
                 local SCALE_POS  = CFrame.new(6594, 383, 139)
                 local _farmingScale = true
 
-                -- Bật anti-gravity để lơ lửng
-                StartAntiGravity()
-                -- Tween đến vùng mob trước
+                -- Bật float để lơ lửng
+                StartFloat()
+                -- Tween đến vùng mob trước, sau đó float giữ ở đó
                 TweenTo(SCALE_POS * CFrame.new(0, 30, 0))
+                SetFloatPos(SCALE_POS * CFrame.new(0, 30, 0))
 
                 while _farmingScale do
                     pcall(function()
@@ -745,15 +766,15 @@ do
                                 or not target:FindFirstChild("Humanoid")
                                 or target.Humanoid.Health <= 0
                         else
-                            -- Không thấy mob → tween đến vùng spawn chờ respawn
-                            TweenTo(SCALE_POS * CFrame.new(0, 30, 0))
+                            -- Không thấy mob → float giữ tại vùng spawn chờ respawn
+                            SetFloatPos(SCALE_POS * CFrame.new(0, 30, 0))
                         end
                     end)
                     task.wait(0.2)
                 end
 
                 -- Tắt anti-gravity
-                StopAntiGravity()
+                StopFloat()
 
                 local invFinal, _ = GetInventory()
                 local _, finalScale = HasItem(invFinal, "Dragon Scale")
@@ -847,22 +868,23 @@ do
                     end)
                 end
 
-                -- Thread phụ: tự động nhặt Ember (từ Banana)
+                -- Thread phụ: nhặt Ember (direct CFrame, không dùng SetFloatPos để tránh conflict combat)
                 task.spawn(function()
                     while _farmingEmber do
                         pcall(function()
                             if workspace:FindFirstChild("EmberTemplate") and workspace.EmberTemplate:FindFirstChild("Part") then
                                 if Character and HumanoidRootPart then
+                                    -- Flash CFrame 1 frame để nhặt, Heartbeat sẽ kéo về ghost ngay frame sau
                                     HumanoidRootPart.CFrame = workspace.EmberTemplate.Part.CFrame
                                 end
                             end
                         end)
-                        task.wait(0.1)
+                        task.wait(0.15)
                     end
                 end)
 
-                -- Bật anti-gravity
-                StartAntiGravity()
+                -- Bật float
+                StartFloat()
 
                 -- Loop chính farm Dragon Hunter
                 while _farmingEmber do
@@ -882,7 +904,6 @@ do
                             -- QUEST LOẠI 1: Defeat mob
                             if questType == 1 then
                                 if mobName == "Hydra Enforcer" or mobName == "Venomous Assailant" then
-                                    -- Tìm con mob quest yêu cầu
                                     local target = FindClosestMob({mobName})
                                     if target then
                                         -- Lock con này, đánh đến chết
@@ -896,8 +917,8 @@ do
                                             or target.Humanoid.Health <= 0
                                             or isBackToDojo()
                                     else
-                                        -- Mob chưa spawn → tween đến vùng mob chờ
-                                        TweenTo(HYDRA_POS * CFrame.new(0, 30, 0))
+                                        -- Mob chưa spawn → float giữ tại vùng mob chờ
+                                        SetFloatPos(HYDRA_POS * CFrame.new(0, 30, 0))
                                     end
                                 end
 
@@ -906,27 +927,37 @@ do
                                 pcall(function()
                                     local tree = workspace.Map.Waterfall.IslandModel:FindFirstChild("Meshes/bambootree", true)
                                     if tree then
+                                        -- Tạm tắt float để đến cây
+                                        StopFloat()
                                         TweenTo(tree.CFrame * CFrame.new(4, 0, 0))
                                         if HumanoidRootPart and (tree.Position - HumanoidRootPart.Position).Magnitude <= 200 then
                                             UseAllSkills()
                                         end
+                                        -- Bật lại float
+                                        StartFloat()
                                     end
                                 end)
                             end
                         else
-                            -- Không có quest / cần quay về Dojo → claim rồi tween về
+                            -- Không có quest / cần quay về Dojo → tắt float, bay về, claim, bật lại
+                            StopFloat()
                             if isBackToDojo() then
+                                TweenTo(DOJO_POS)
+                                task.wait(0.3)
                                 claimDragonQuest()
                                 task.wait(0.5)
+                            else
+                                TweenTo(DOJO_POS)
+                                task.wait(0.5)
                             end
-                            TweenTo(DOJO_POS)
+                            StartFloat()
                         end
                     end)
                     task.wait(0.2)
                 end
 
-                -- Tắt anti-gravity
-                StopAntiGravity()
+                -- Tắt float
+                StopFloat()
 
                 _farmingEmber = false
 
