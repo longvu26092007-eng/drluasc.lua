@@ -63,87 +63,74 @@ Player.CharacterAdded:Connect(function(v)
 end)
 
 -- ==========================================
--- [ 1.1 ] HỆ THỐNG DI CHUYỂN BÓNG (TWEEN)
+-- [ 1.1 ] HỆ THỐNG DI CHUYỂN TWEEN Bypass
+-- Đã fix lỗi bay lên xuống (Yo-yo) bằng BodyVelocity an toàn tuyệt đối
 -- ==========================================
-local _tweenGhost = nil
-local _tweenConn  = nil
-local _tweenObj   = nil
-
-local function SmoothTween(targetCFrame, speed)
-    speed = speed or 300
-    local char = Player.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-    local hrp = char.HumanoidRootPart
-
-    if not _tweenGhost or not _tweenGhost.Parent then
-        _tweenGhost = Instance.new("Part")
-        _tweenGhost.Name         = "DracoGhost"
-        _tweenGhost.Transparency = 1
-        _tweenGhost.Anchored     = true
-        _tweenGhost.CanCollide   = false
-        _tweenGhost.Size         = Vector3.new(50, 50, 50)
-        _tweenGhost.CFrame       = hrp.CFrame
-        _tweenGhost.Parent       = workspace
-    end
-
-    if _tweenObj then _tweenObj:Cancel(); _tweenObj = nil end
-
-    local dist = (targetCFrame.Position - _tweenGhost.Position).Magnitude
-    local timeToTween = dist / speed
-
-    if dist > 5000 then
-        _tweenGhost.CFrame = targetCFrame
-    else
-        _tweenObj = TweenService:Create(_tweenGhost, TweenInfo.new(timeToTween, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
-        _tweenObj:Play()
-    end
-
-    if not _tweenConn then
-        _tweenConn = RunService.Heartbeat:Connect(function()
-            pcall(function()
-                local c = Player.Character
-                if c and c:FindFirstChild("HumanoidRootPart") and _tweenGhost and _tweenGhost.Parent then
-                    c.HumanoidRootPart.CFrame = _tweenGhost.CFrame
-                    local h = c:FindFirstChild("Humanoid")
-                    if h then h.Sit = false end
-                    for _, p in pairs(c:GetDescendants()) do
-                        if p:IsA("BasePart") and p.CanCollide then
-                            p.CanCollide = false
-                        end
-                    end
-                end
-            end)
-        end)
-    end
-end
-
-local function StopSmoothTween()
-    if _tweenObj then _tweenObj:Cancel(); _tweenObj = nil end
-    if _tweenConn then _tweenConn:Disconnect(); _tweenConn = nil end
-    if _tweenGhost then _tweenGhost:Destroy(); _tweenGhost = nil end
-    pcall(function()
-        if Player.Character and Player.Character:FindFirstChild("Humanoid") then
-            Player.Character.Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-        end
-    end)
-end
-
+_G.CancelTween = false
 local function TweenTo(targetCFrame, speed)
     local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
     if not hrp then return false end
 
-    SmoothTween(targetCFrame, speed)
-
-    while _tweenGhost and _tweenGhost.Parent and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") do
-        local dist = (Player.Character.HumanoidRootPart.Position - targetCFrame.Position).Magnitude
-        if dist <= 10 then break end
-        task.wait(0.1)
+    local dist = (hrp.Position - targetCFrame.Position).Magnitude
+    if dist < 10 then 
+        hrp.CFrame = targetCFrame
+        return true 
     end
+
+    local bv = hrp:FindFirstChild("DracoAntiGravity") or Instance.new("BodyVelocity")
+    bv.Name = "DracoAntiGravity"
+    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bv.Velocity = Vector3.new(0, 0, 0)
+    bv.Parent = hrp
+
+    speed = speed or 300
+    local timeToTween = dist / speed
+    local tweenObj = TweenService:Create(hrp, TweenInfo.new(timeToTween, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
+    
+    tweenObj:Play()
+    
+    _G.CancelTween = false
+    local reached = false
+    local conn
+    conn = RunService.Heartbeat:Connect(function()
+        if _G.CancelTween or not hrp or not hrp.Parent then
+            tweenObj:Cancel()
+            reached = true
+        elseif (hrp.Position - targetCFrame.Position).Magnitude <= 15 then
+            tweenObj:Cancel()
+            reached = true
+        end
+    end)
+
+    local noclip
+    noclip = RunService.Stepped:Connect(function()
+        local char = Player.Character
+        if char then
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BasePart") and part.CanCollide then
+                    part.CanCollide = false
+                end
+            end
+            local hum = char:FindFirstChild("Humanoid")
+            if hum then hum:ChangeState(11) end
+        end
+    end)
+
+    while not reached do task.wait(0.1) end
+    
+    if conn then conn:Disconnect() end
+    if noclip then noclip:Disconnect() end
+    if bv and bv.Parent then bv:Destroy() end
+
     return true
 end
 
+local function StopTween()
+    _G.CancelTween = true
+end
+
 -- ==========================================
--- [ PHẦN 1.3 ] HỆ THỐNG ATTACK & BRING MOB (CHUẨN BANANA)
+-- [ PHẦN 1.3 ] HỆ THỐNG ATTACK
 -- ==========================================
 local COMMF_ = ReplicatedStorage:WaitForChild("Remotes") and ReplicatedStorage.Remotes:WaitForChild("CommF_")
 local remoteAttack, idremote
@@ -249,37 +236,6 @@ local function FindClosestMob(mobNames)
     return closest
 end
 
--- Bring Enemy chuẩn Banana Hub
-local function BringEnemy(centerPos, validNamesList)
-    pcall(function()
-        if setsimulationradius then setsimulationradius(math.huge, math.huge) end
-        Player.SimulationRadius = math.huge
-        for _, v in pairs(workspace.Enemies:GetChildren()) do
-            local eh = v:FindFirstChild("Humanoid")
-            local ehrp = v:FindFirstChild("HumanoidRootPart")
-            if eh and eh.Health > 0 and ehrp then
-                local isValid = false
-                if type(validNamesList) == "table" then
-                    for _, n in ipairs(validNamesList) do
-                        if v.Name == n then isValid = true; break end
-                    end
-                else
-                    isValid = (v.Name == validNamesList)
-                end
-
-                if isValid and (ehrp.Position - centerPos).Magnitude <= 350 then
-                    ehrp.CFrame = CFrame.new(centerPos)
-                    ehrp.CanCollide = false
-                    eh.WalkSpeed = 0
-                    eh.JumpPower = 0
-                    eh:ChangeState(11)
-                    if ehrp:FindFirstChild("BodyVelocity") then ehrp.BodyVelocity:Destroy() end
-                end
-            end
-        end
-    end)
-end
-
 local lastKenCall = tick()
 local function EnsureBuso()
     pcall(function()
@@ -287,6 +243,78 @@ local function EnsureBuso()
             COMMF_:InvokeServer("Buso")
         end
     end)
+end
+
+-- ==========================================
+-- HÀM ATTACK + BRING MOB TỐI ƯU CỰC MƯỢT
+-- ==========================================
+local function SafeKillMob(targetModel, validNamesList)
+    xpcall(function()
+        if not targetModel or not targetModel.Parent then return end
+        local vh = targetModel:FindFirstChild("Humanoid")
+        local vhrp = targetModel:FindFirstChild("HumanoidRootPart")
+        if not vh or vh.Health <= 0 or not vhrp then return end
+
+        local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        pcall(function()
+            if setsimulationradius then setsimulationradius(math.huge, math.huge) end
+            if sethiddenproperty then sethiddenproperty(Player, "SimulationRadius", math.huge) end
+            Player.SimulationRadius = math.huge
+        end)
+
+        if not targetModel:GetAttribute("Locked") then
+            targetModel:SetAttribute("Locked", vhrp.CFrame)
+        end
+        local lockedPos = targetModel:GetAttribute("Locked").Position
+        local lockedCFrame = CFrame.new(lockedPos)
+
+        -- Hút quái đa mục tiêu
+        pcall(function()
+            for _, enemy in pairs(workspace.Enemies:GetChildren()) do
+                local eh = enemy:FindFirstChild("Humanoid")
+                local ehrp = enemy:FindFirstChild("HumanoidRootPart")
+                if eh and eh.Health > 0 and ehrp and enemy ~= targetModel then
+                    
+                    local isValid = false
+                    if type(validNamesList) == "table" then
+                        for _, n in ipairs(validNamesList) do
+                            if enemy.Name == n then isValid = true; break end
+                        end
+                    else
+                        isValid = (enemy.Name == targetModel.Name)
+                    end
+
+                    if isValid and (ehrp.Position - lockedPos).Magnitude <= 350 then
+                        ehrp.CFrame = lockedCFrame
+                        ehrp.CanCollide = false
+                        eh.WalkSpeed = 0
+                        eh.JumpPower = 0
+                        eh:ChangeState(11) 
+                        if ehrp:FindFirstChild("BodyVelocity") then ehrp.BodyVelocity:Destroy() end
+                    end
+                end
+            end
+        end)
+
+        local dist = (hrp.Position - lockedPos).Magnitude
+        local attackPos = CFrame.new(lockedPos + Vector3.new(0, 30, 0), lockedPos)
+
+        -- Áp dụng logic chuẩn: nếu xa thì bay lại, gần thì chém thẳng tay
+        if dist > 60 then
+            TweenTo(attackPos)
+        else
+            hrp.CFrame = attackPos
+            EquipWeaponTool("Melee")
+            FastAttack(validNamesList or targetModel.Name)
+
+            if tick() - lastKenCall >= 10 then
+                lastKenCall = tick()
+                pcall(function() ReplicatedStorage.Remotes.CommE:FireServer("Ken", true) end)
+            end
+        end
+    end, function(e) warn("[DracoAuto] SafeKillMob ERROR:", e) end)
 end
 
 local VIM = game:GetService("VirtualInputManager")
@@ -665,35 +693,21 @@ do
                         local target = FindClosestMob(SCALE_MOBS)
                         if target then
                             EnsureBuso()
-                            
-                            local targetPos = target:GetAttribute("LockedPos")
-                            if not targetPos then
-                                targetPos = target.HumanoidRootPart.Position
-                                target:SetAttribute("LockedPos", targetPos)
-                            end
-
-                            BringEnemy(targetPos, SCALE_MOBS)
-
-                            local attackPos = CFrame.new(targetPos + Vector3.new(0, 30, 0), targetPos)
-                            SmoothTween(attackPos, 300)
-
-                            local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-                            if hrp and (hrp.Position - targetPos).Magnitude <= 50 then
-                                EquipWeaponTool("Melee")
-                                FastAttack(SCALE_MOBS)
-                                if tick() - lastKenCall >= 10 then
-                                    lastKenCall = tick()
-                                    pcall(function() ReplicatedStorage.Remotes.CommE:FireServer("Ken", true) end)
-                                end
-                            end
+                            repeat
+                                SafeKillMob(target, SCALE_MOBS)
+                                task.wait(0.15) 
+                            until not _farmingScale
+                                or not target or not target.Parent
+                                or not target:FindFirstChild("Humanoid")
+                                or target.Humanoid.Health <= 0
                         else
-                            SmoothTween(SCALE_POS * CFrame.new(0, 30, 0), 300)
+                            TweenTo(CFrame.new(SCALE_POS.Position + Vector3.new(0, 30, 0), SCALE_POS.Position), 300)
                         end
                     end)
-                    task.wait(0.15)
+                    task.wait(0.2)
                 end
                 
-                StopSmoothTween()
+                StopTween()
 
                 local invFinal, _ = GetInventory()
                 local _, finalScale = HasItem(invFinal, "Dragon Scale")
@@ -720,34 +734,37 @@ do
                 local DOJO_POS  = CFrame.new(5813, 1208, 884)
                 local HYDRA_POS = CFrame.new(4620.61572265625, 1002.2954711914062, 399.0868835449219)
                 local _farmingEmber = true
-                local isCollectingEmber = false -- BIẾN KHÓA LUỒNG
+                local isCollectingEmber = false
 
+                -- Đã FIX: Gọi RequestQuest an toàn, tránh Spam làm Quest bị kẹt
                 local function checkDragonQuest()
-                    local questData = nil
-                    local hasQuest  = false
-                    local mobName, questCount, questType = nil, nil, nil
-
+                    local hasQuest, mobName, questCount, questType = false, nil, nil, nil
                     pcall(function()
                         local Net = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
                         local RF  = Net:WaitForChild("RF/DragonHunter")
-                        pcall(function() RF:InvokeServer(unpack({[1] = {["Context"] = "RequestQuest"}})) end)
-                        questData = RF:InvokeServer(unpack({[1] = {["Context"] = "Check"}}))
-                    end)
-
-                    if questData and questData.Text then
-                        hasQuest = true
-                        local txt = tostring(questData.Text)
-                        if string.find(txt, "Defeat") then
-                            questType  = 1
-                            questCount = tonumber(string.sub(txt, 8, 9))
-                            for _, m in pairs({"Hydra Enforcer", "Venomous Assailant"}) do
-                                if string.find(txt, m) then mobName = m; break end
-                            end
-                        elseif string.find(txt, "Destroy") then
-                            questType  = 2
-                            questCount = 10
+                        local questData = RF:InvokeServer(unpack({[1] = {["Context"] = "Check"}}))
+                        
+                        -- Chĩ request quest NẾU CHƯA CÓ QUEST ĐANG CHẠY
+                        if not questData or not questData.Text then
+                            RF:InvokeServer(unpack({[1] = {["Context"] = "RequestQuest"}}))
+                            questData = RF:InvokeServer(unpack({[1] = {["Context"] = "Check"}}))
                         end
-                    end
+                        
+                        if questData and questData.Text then
+                            hasQuest = true
+                            local txt = tostring(questData.Text)
+                            if string.find(txt, "Defeat") then
+                                questType  = 1
+                                questCount = tonumber(string.sub(txt, 8, 9))
+                                for _, m in pairs({"Hydra Enforcer", "Venomous Assailant"}) do
+                                    if string.find(txt, m) then mobName = m; break end
+                                end
+                            elseif string.find(txt, "Destroy") then
+                                questType  = 2
+                                questCount = 10
+                            end
+                        end
+                    end)
                     return hasQuest, mobName, questCount, questType
                 end
 
@@ -774,14 +791,14 @@ do
                     end)
                 end
 
-                -- LUỒNG NHẶT EMBER CÁCH LY
+                -- Luồng chuyên săn Ember rơi ra
                 task.spawn(function()
                     while _farmingEmber do
                         pcall(function()
                             local ember = workspace:FindFirstChild("EmberTemplate")
                             if ember and ember:FindFirstChild("Part") then
                                 isCollectingEmber = true
-                                StopSmoothTween() -- Tạm dừng đánh quái
+                                StopTween() -- Hủy việc di chuyển hiện tại để nhặt
                                 local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
                                 if hrp then
                                     hrp.CFrame = ember.Part.CFrame
@@ -794,10 +811,9 @@ do
                     end
                 end)
 
-                -- LUỒNG CHÍNH FARM EMBER
                 while _farmingEmber do
                     pcall(function()
-                        if isCollectingEmber then return end -- NẾU ĐANG NHẶT EMBER THÌ BỎ QUA ĐÁNH QUÁI
+                        if isCollectingEmber then return end -- Nhặt Ember ưu tiên tuyệt đối
 
                         local invLoop, _ = GetInventory()
                         local _, nowEmber = HasItem(invLoop, "Blaze Ember")
@@ -817,29 +833,16 @@ do
                                     local target = FindClosestMob({mobName})
                                     if target then
                                         EnsureBuso()
-                                        
-                                        local targetPos = target:GetAttribute("LockedPos")
-                                        if not targetPos then
-                                            targetPos = target.HumanoidRootPart.Position
-                                            target:SetAttribute("LockedPos", targetPos)
-                                        end
-
-                                        BringEnemy(targetPos, {mobName})
-
-                                        local attackPos = CFrame.new(targetPos + Vector3.new(0, 30, 0), targetPos)
-                                        SmoothTween(attackPos, 300)
-
-                                        local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-                                        if hrp and (hrp.Position - targetPos).Magnitude <= 50 then
-                                            EquipWeaponTool("Melee")
-                                            FastAttack({mobName})
-                                            if tick() - lastKenCall >= 10 then
-                                                lastKenCall = tick()
-                                                pcall(function() ReplicatedStorage.Remotes.CommE:FireServer("Ken", true) end)
-                                            end
-                                        end
+                                        repeat
+                                            SafeKillMob(target, {mobName})
+                                            task.wait(0.15)
+                                        until not _farmingEmber
+                                            or not target or not target.Parent
+                                            or not target:FindFirstChild("Humanoid")
+                                            or target.Humanoid.Health <= 0
+                                            or isBackToDojo()
                                     else
-                                        SmoothTween(HYDRA_POS * CFrame.new(0, 30, 0), 300)
+                                        TweenTo(CFrame.new(HYDRA_POS.Position + Vector3.new(0, 30, 0), HYDRA_POS.Position), 300)
                                     end
                                 end
 
@@ -848,28 +851,31 @@ do
                                 pcall(function()
                                     local tree = workspace.Map.Waterfall.IslandModel:FindFirstChild("Meshes/bambootree", true)
                                     if tree then
-                                        SmoothTween(tree.CFrame * CFrame.new(4, 0, 0), 300)
+                                        TweenTo(tree.CFrame * CFrame.new(4, 0, 0))
                                         local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-                                        if hrp and (hrp.Position - tree.Position).Magnitude <= 15 then
+                                        if hrp and (tree.Position - hrp.Position).Magnitude <= 50 then
                                             UseAllSkills()
                                         end
                                     end
                                 end)
                             end
                         else
-                            -- Về Dojo
-                            SmoothTween(DOJO_POS, 300)
-                            local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-                            if hrp and (hrp.Position - DOJO_POS.Position).Magnitude <= 15 then
+                            StopTween()
+                            if isBackToDojo() then
+                                TweenTo(DOJO_POS)
+                                task.wait(0.3)
                                 claimDragonQuest()
+                                task.wait(0.5)
+                            else
+                                TweenTo(DOJO_POS)
                                 task.wait(0.5)
                             end
                         end
                     end)
-                    task.wait(0.15)
+                    task.wait(0.2)
                 end
 
-                StopSmoothTween()
+                StopTween()
                 _farmingEmber = false
 
                 local invFinal, _ = GetInventory()
