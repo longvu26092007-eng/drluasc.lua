@@ -203,55 +203,113 @@ local function BringEnemy(centerPos)
     end)
 end
 
-local lastKenCall = tick()
-local function KillMonster(x)
-    xpcall(function()
-        -- Tìm mob trong workspace.Enemies
-        if workspace.Enemies:FindFirstChild(x) then
-            for _, v in next, workspace.Enemies:GetChildren() do
-                local vh = v:FindFirstChild("Humanoid")
-                local vhrp = v:FindFirstChild("HumanoidRootPart")
-                if vh and vh.Health > 0 and vhrp and v.Name == x then
-                    -- Lock vị trí gốc của mob (Banana style)
-                    if not v:GetAttribute("Locked") then
-                        v:SetAttribute("Locked", vhrp.CFrame)
+-- Anti-Gravity: giữ nhân vật lơ lửng liên tục, không bị rơi
+local _antiGravConn = nil
+local function StartAntiGravity()
+    if _antiGravConn then return end -- đã bật rồi
+    _antiGravConn = RunService.Heartbeat:Connect(function()
+        pcall(function()
+            local chr = Player.Character
+            if not chr then return end
+            local hrp = chr:FindFirstChild("HumanoidRootPart")
+            local hum = chr:FindFirstChild("Humanoid")
+            if not hrp or not hum or hum.Health <= 0 then return end
+            -- Giữ lơ lửng bằng BodyVelocity
+            local bv = hrp:FindFirstChild("DracoFloat")
+            if not bv then
+                bv = Instance.new("BodyVelocity")
+                bv.Name = "DracoFloat"
+                bv.MaxForce = Vector3.new(0, math.huge, 0)
+                bv.Velocity = Vector3.new(0, 0, 0)
+                bv.Parent = hrp
+            end
+            -- Noclip
+            hum:ChangeState(11)
+            for _, part in pairs(chr:GetDescendants()) do
+                if part:IsA("BasePart") and part.CanCollide then
+                    part.CanCollide = false
+                end
+            end
+        end)
+    end)
+end
+
+local function StopAntiGravity()
+    if _antiGravConn then
+        _antiGravConn:Disconnect()
+        _antiGravConn = nil
+    end
+    pcall(function()
+        local chr = Player.Character
+        if chr and chr:FindFirstChild("HumanoidRootPart") then
+            local bv = chr.HumanoidRootPart:FindFirstChild("DracoFloat")
+            if bv then bv:Destroy() end
+        end
+    end)
+end
+
+-- Tìm mob gần nhất trong danh sách tên (không chỉ con đầu tiên)
+local function FindClosestMob(mobNames)
+    local closest = nil
+    local closestDist = math.huge
+    if not HumanoidRootPart then return nil end
+
+    for _, enemy in pairs(workspace.Enemies:GetChildren()) do
+        local eh = enemy:FindFirstChild("Humanoid")
+        local ehrp = enemy:FindFirstChild("HumanoidRootPart")
+        if eh and ehrp and eh.Health > 0 then
+            for _, name in ipairs(mobNames) do
+                if enemy.Name == name then
+                    local d = (ehrp.Position - HumanoidRootPart.Position).Magnitude
+                    if d < closestDist then
+                        closestDist = d
+                        closest = enemy
                     end
-                    local lockedPos = v:GetAttribute("Locked").Position
-
-                    local dist = (HumanoidRootPart.Position - vhrp.Position).Magnitude
-
-                    if dist <= 70 then
-                        -- Trong tầm → BringEnemy + bay trên đầu 30 stud + FastAttack
-                        BringEnemy(lockedPos)
-                        FastAttack(x)
-
-                        if tick() - lastKenCall >= 10 then
-                            lastKenCall = tick()
-                            ReplicatedStorage.Remotes.CommE:FireServer("Ken", true)
-                        end
-
-                        -- Bay trên đầu mob 30 stud, quay mặt xuống (Banana style)
-                        EquipWeaponTool("Melee")
-                        TweenTo(vhrp.CFrame * CFrame.new(0, 30, 0) * CFrame.Angles(0, math.rad(180), 0))
-                        return
-                    end
-
-                    -- Xa → tween đến mob
-                    TweenTo(vhrp.CFrame * CFrame.new(0, 30, 0))
-                    return
                 end
             end
         end
+    end
+    return closest
+end
 
-        -- Mob trong ReplicatedStorage (chưa spawn) → tween đến
-        for _, v in next, ReplicatedStorage:GetChildren() do
-            local vhrp = v:FindFirstChild("HumanoidRootPart")
-            if v:IsA("Model") and vhrp and v.Name == x then
-                TweenTo(vhrp.CFrame * CFrame.new(0, 30, 0))
-                return
-            end
+local lastKenCall = tick()
+-- KillMonster: bay trên đầu 1 con mob cụ thể, đánh nó (1 tick)
+local function KillMonster(targetModel)
+    xpcall(function()
+        if not targetModel or not targetModel.Parent then return end
+        local vh = targetModel:FindFirstChild("Humanoid")
+        local vhrp = targetModel:FindFirstChild("HumanoidRootPart")
+        if not vh or vh.Health <= 0 or not vhrp then return end
+
+        -- Lock vị trí gốc của mob (Banana style)
+        if not targetModel:GetAttribute("Locked") then
+            targetModel:SetAttribute("Locked", vhrp.CFrame)
         end
+        local lockedPos = targetModel:GetAttribute("Locked").Position
+
+        -- BringEnemy + FastAttack
+        BringEnemy(lockedPos)
+        EquipWeaponTool("Melee")
+        FastAttack(targetModel.Name)
+
+        -- Ken Haki mỗi 10s
+        if tick() - lastKenCall >= 10 then
+            lastKenCall = tick()
+            pcall(function() ReplicatedStorage.Remotes.CommE:FireServer("Ken", true) end)
+        end
+
+        -- Bay trên đầu mob 30 stud (set CFrame trực tiếp vì đã có AntiGravity giữ)
+        HumanoidRootPart.CFrame = vhrp.CFrame * CFrame.new(0, 30, 0) * CFrame.Angles(0, math.rad(180), 0)
+
     end, function(e) warn("[DracoAuto] KillMonster ERROR:", e) end)
+end
+
+-- KillMonsterByName: tìm mob theo tên rồi gọi KillMonster (dùng cho Dragon Hunter)
+local function KillMonsterByName(mobName)
+    local target = FindClosestMob({mobName})
+    if target then
+        KillMonster(target)
+    end
 end
 
 local function EnsureBuso()
@@ -657,6 +715,11 @@ do
                 local SCALE_POS  = CFrame.new(6594, 383, 139)
                 local _farmingScale = true
 
+                -- Bật anti-gravity để lơ lửng
+                StartAntiGravity()
+                -- Tween đến vùng mob trước
+                TweenTo(SCALE_POS * CFrame.new(0, 30, 0))
+
                 while _farmingScale do
                     pcall(function()
                         local invLoop, _ = GetInventory()
@@ -668,32 +731,29 @@ do
                             return
                         end
 
-                        -- Tìm mob Dragon Crew còn sống → KillMonster
-                        local foundMob = false
-                        for _, mobName in ipairs(SCALE_MOBS) do
-                            for _, enemy in pairs(workspace.Enemies:GetChildren()) do
-                                local eh = enemy:FindFirstChild("Humanoid")
-                                local ehrp = enemy:FindFirstChild("HumanoidRootPart")
-                                if enemy.Name == mobName and eh and ehrp and eh.Health > 0 then
-                                    foundMob = true
-                                    EquipWeaponTool("Melee")
-                                    EnsureBuso()
-                                    KillMonster(mobName)
-                                    break
-                                end
-                            end
-                            if foundMob then break end
-                        end
+                        -- Tìm con mob gần nhất (Archer hoặc Warrior đều được)
+                        local target = FindClosestMob(SCALE_MOBS)
 
-                        -- Không tìm thấy mob → tween đến vị trí spawn
-                        if not foundMob then
-                            if HumanoidRootPart then
-                                TweenTo(SCALE_POS)
-                            end
+                        if target then
+                            -- Lock con này, đánh đến chết mới chuyển con khác
+                            EnsureBuso()
+                            repeat
+                                KillMonster(target)
+                                task.wait(0.15)
+                            until not _farmingScale
+                                or not target or not target.Parent
+                                or not target:FindFirstChild("Humanoid")
+                                or target.Humanoid.Health <= 0
+                        else
+                            -- Không thấy mob → tween đến vùng spawn chờ respawn
+                            TweenTo(SCALE_POS * CFrame.new(0, 30, 0))
                         end
                     end)
-                    task.wait(0.3)
+                    task.wait(0.2)
                 end
+
+                -- Tắt anti-gravity
+                StopAntiGravity()
 
                 local invFinal, _ = GetInventory()
                 local _, finalScale = HasItem(invFinal, "Dragon Scale")
@@ -793,13 +853,16 @@ do
                         pcall(function()
                             if workspace:FindFirstChild("EmberTemplate") and workspace.EmberTemplate:FindFirstChild("Part") then
                                 if Character and HumanoidRootPart then
-                                    TweenTo(workspace.EmberTemplate.Part.CFrame)
+                                    HumanoidRootPart.CFrame = workspace.EmberTemplate.Part.CFrame
                                 end
                             end
                         end)
                         task.wait(0.1)
                     end
                 end)
+
+                -- Bật anti-gravity
+                StartAntiGravity()
 
                 -- Loop chính farm Dragon Hunter
                 while _farmingEmber do
@@ -819,20 +882,22 @@ do
                             -- QUEST LOẠI 1: Defeat mob
                             if questType == 1 then
                                 if mobName == "Hydra Enforcer" or mobName == "Venomous Assailant" then
-                                    local foundMob = false
-                                    for _, enemy in pairs(workspace.Enemies:GetChildren()) do
-                                        local eh   = enemy:FindFirstChild("Humanoid")
-                                        local ehrp = enemy:FindFirstChild("HumanoidRootPart")
-                                        if enemy.Name == mobName and eh and ehrp and eh.Health > 0 then
-                                            foundMob = true
-                                            EquipWeaponTool("Melee")
-                                            EnsureBuso()
-                                            KillMonster(mobName)
-                                            break
-                                        end
-                                    end
-                                    if not foundMob then
-                                        TweenTo(HYDRA_POS)
+                                    -- Tìm con mob quest yêu cầu
+                                    local target = FindClosestMob({mobName})
+                                    if target then
+                                        -- Lock con này, đánh đến chết
+                                        EnsureBuso()
+                                        repeat
+                                            KillMonster(target)
+                                            task.wait(0.15)
+                                        until not _farmingEmber
+                                            or not target or not target.Parent
+                                            or not target:FindFirstChild("Humanoid")
+                                            or target.Humanoid.Health <= 0
+                                            or isBackToDojo()
+                                    else
+                                        -- Mob chưa spawn → tween đến vùng mob chờ
+                                        TweenTo(HYDRA_POS * CFrame.new(0, 30, 0))
                                     end
                                 end
 
@@ -849,16 +914,19 @@ do
                                 end)
                             end
                         else
-                            -- Không có quest / cần quay về Dojo → claim rồi tp
+                            -- Không có quest / cần quay về Dojo → claim rồi tween về
                             if isBackToDojo() then
                                 claimDragonQuest()
                                 task.wait(0.5)
                             end
-                                TweenTo(DOJO_POS)
+                            TweenTo(DOJO_POS)
                         end
                     end)
-                    task.wait(0.3)
+                    task.wait(0.2)
                 end
+
+                -- Tắt anti-gravity
+                StopAntiGravity()
 
                 _farmingEmber = false
 
