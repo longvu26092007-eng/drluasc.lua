@@ -1,17 +1,18 @@
 -- ==========================================
--- SCRIPT CHỈ NHẬN QUEST DRAGON HUNTER & RE-QUEST
+-- SCRIPT: AUTO NHẬN QUEST DRAGON HUNTER (STRICT FLOW)
+-- Logic: Nhận lần đầu -> Đứng im -> Đợi Noti -> Nhận lại
 -- ==========================================
 
-local Player = game.Players.LocalPlayer
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 
--- Tọa độ NPC Dojo Trainer để nhận quest
-local DOJO_POS = CFrame.new(5813, 1208, 884) 
+local Player = Players.LocalPlayer
+local DOJO_POS = CFrame.new(5813, 1208, 884) -- Tọa độ NPC Dojo Trainer
 
 -- ==========================================
--- [HÀM DI CHUYỂN AN TOÀN]
+-- [HÀM DI CHUYỂN TWEEN AN TOÀN]
 -- ==========================================
 local function TweenTo(targetCFrame)
     local char = Player.Character
@@ -46,14 +47,11 @@ local function TweenTo(targetCFrame)
     
     if noclip then noclip:Disconnect() end
     if bv then bv:Destroy() end
-    if hum then hum:ChangeState(8) end
 end
 
 -- ==========================================
--- [HÀM NHẬN QUEST & CHECK NOTI]
+-- [HÀM NHẬN NHIỆM VỤ]
 -- ==========================================
-
--- Gọi Remote nhận quest chuẩn Banana
 local function ClaimDragonQuest()
     pcall(function()
         local Net = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
@@ -63,63 +61,54 @@ local function ClaimDragonQuest()
     end)
 end
 
--- Kiểm tra thông báo hoàn thành để đi nhận lại
-local function IsNeedToReQuest()
-    local result = false
+-- ==========================================
+-- [HÀM QUÉT THÔNG BÁO - CHUẨN BANANA]
+-- ==========================================
+local function CheckBackToDojoNotification()
+    local found = false
     pcall(function()
         local notifications = Player.PlayerGui:FindFirstChild("Notifications")
         if notifications then
-            for _, b in pairs(notifications:GetChildren()) do
-                if b.Name == "NotificationTemplate" and string.find(b.Text, "Head back to the Dojo") then
-                    result = true
-                    break
+            for _, v in pairs(notifications:GetChildren()) do
+                if v.Name == "NotificationTemplate" and v:FindFirstChild("Text") then
+                    if string.find(v.Text, "Head back to the Dojo to complete more tasks") then
+                        found = true
+                        -- Xóa thông báo sau khi đọc để tránh nhận nhầm vòng lặp sau
+                        v:Destroy()
+                        break
+                    end
                 end
             end
         end
     end)
-    return result
-end
-
--- Kiểm tra xem hiện tại đã có quest chưa (để tránh spam)
-local function HasQuestActive()
-    local active = false
-    pcall(function()
-        local Net = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
-        local questData = Net:WaitForChild("RF/DragonHunter"):InvokeServer(unpack({[1] = {["Context"] = "Check"}}))
-        if questData and questData.Text and not string.find(questData.Text, "Head back") then
-            active = true
-        end
-    end)
-    return active
+    return found
 end
 
 -- ==========================================
--- [VÒNG LẶP CHÍNH]
+-- [VÒNG LẶP CHÍNH - THEO TRÌNH TỰ]
 -- ==========================================
 
-warn("[Draco] Script Nhận Quest Only đã chạy!")
+warn("[Draco] Script Start: Chờ nhận nhiệm vụ đầu tiên...")
 
+-- Bước 1: Nhận nhiệm vụ lần đầu
+TweenTo(DOJO_POS)
+task.wait(0.5)
+ClaimDragonQuest()
+warn("[Draco] Đã nhận xong nhiệm vụ đầu. Đứng im chờ thông báo hoàn thành...")
+
+-- Bước 2: Chờ thông báo để nhận lại
 task.spawn(function()
     while true do
-        local needRequest = IsNeedToReQuest()
-        local active = HasQuestActive()
-        
-        -- Nếu có thông báo cần về Dojo HOẶC chưa có quest nào đang làm
-        if needRequest or not active then
-            print("[Draco] Phát hiện cần nhận nhiệm vụ, đang bay tới NPC...")
+        if CheckBackToDojoNotification() then
+            warn("[Draco] Đã thấy thông báo Head back! Đang quay lại nhận quest mới...")
             
-            -- Bay tới NPC
+            -- Di chuyển về nhận tiếp
             TweenTo(DOJO_POS)
-            
-            -- Nhận quest
             task.wait(0.5)
             ClaimDragonQuest()
-            print("[Draco] Đã thực hiện nhận quest. Đang đứng chờ...")
             
-            -- Đứng đợi 3s để thông báo cũ biến mất và quest mới ổn định
-            task.wait(3)
+            warn("[Draco] Đã nhận quest mới. Tiếp tục đứng im...")
         end
-        
-        task.wait(1) -- Check mỗi giây để không lag máy
+        task.wait(1) -- Quét mỗi giây
     end
 end)
