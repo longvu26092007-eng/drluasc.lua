@@ -561,6 +561,9 @@ do
             ActionStatus.Text = "Hành động: [3.2] Đang bay đến NPC Craft..."
             local arrived = TweenTo(Craft_CFrame)
 
+            if arrived then
+                task.wait(0.3)
+                task.wait(0.5)
                 if not hasHeartNow then
                     ActionStatus.Text = "Hành động: [3.2] Craft Dragonheart..."
                     CraftItem("Dragonheart")
