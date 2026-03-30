@@ -477,7 +477,7 @@ do
             end
         end
 
-        -- BƯỚC B: FARM BLAZE EMBER (TÍCH HỢP FLOW NHẬN QUEST CHUẨN)
+        -- BƯỚC B: FARM BLAZE EMBER (CHẠY VÒNG LẶP VĨNH CỬU CHO ĐẾN KHI ĐỦ)
         do
             local invB, _ = GetInventory()
             local _, emberCount = HasItem(invB, "Blaze Ember")
@@ -487,13 +487,11 @@ do
             else
                 ActionStatus.Text = "Hành động: [3.1-B] Đang chạy luồng nhận Quest Dragon Hunter..."
 
-                -- [LUA NHẬN QUEST TỰ ĐỘNG]
-                local ReplicatedStorage = game:GetService("ReplicatedStorage")
                 local DOJO_POS = CFrame.new(5813, 1208, 884)
 
                 local function ClaimDragonQuest()
                     pcall(function()
-                        local Net = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
+                        local Net = game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Net")
                         Net:FindFirstChild("RF/InteractDragonQuest"):InvokeServer(unpack({
                             [1] = {["NPC"] = "Dojo Trainer", ["Command"] = "ClaimQuest"}
                         }))
@@ -526,9 +524,9 @@ do
                 warn("[Draco] Đã nhận xong nhiệm vụ đầu. Delay 5s để chạy Banana...")
                 task.wait(5)
 
-                -- Luồng nhận lại quest chạy song song
+                -- Luồng nhận lại quest chạy vĩnh cửu
                 task.spawn(function()
-                    while _G.FarmBlazeEM_Running do
+                    while true do
                         if CheckBackToDojoNotification() then
                             warn("[Draco] Đã thấy thông báo Head back! Quay lại nhận quest mới...")
                             TweenTo(DOJO_POS)
@@ -540,19 +538,16 @@ do
                 end)
 
                 -- Bước 2: Chạy Banana Hub
-                _G.FarmBlazeEM_Running = true
                 LoadBananaHub({
                     ["Auto Quest Dragon Hunter"] = true,
                 })
 
-                local lastEmberCount = emberCount
                 repeat
                     task.wait(3)
                     local invLoop, _ = GetInventory()
                     local _, nowEmber = HasItem(invLoop, "Blaze Ember")
                     ActionStatus.Text = string.format("Hành động: [3.1-B] Đang farm Blaze Ember (%d/55)...", nowEmber)
                     if lastEmberCount < EMBER_MIN and nowEmber >= EMBER_MIN then
-                        _G.FarmBlazeEM_Running = false
                         ActionStatus.Text = "Hành động: [3.1-B] ✅ Đủ 55/55 Blaze Ember! Kick..."
                         task.wait(2)
                         Player:Kick("\n[ Draco Auto ]\nĐủ 55/55 Blaze Ember!\nRejoin để Craft Heart & Storm.")
