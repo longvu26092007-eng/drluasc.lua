@@ -70,7 +70,7 @@ local function TweenTo(targetCFrame)
     bv.Velocity = Vector3.new(0, 0, 0)
     bv.Parent   = hrp
 
-    local speed    = 320
+    local speed    = 300
     local time     = distance / speed
     local tweenObj = TweenService:Create(hrp, TweenInfo.new(time, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
 
@@ -477,7 +477,7 @@ do
             end
         end
 
-        -- BƯỚC B: FARM BLAZE EMBER (CHẠY VÒNG LẶP VĨNH CỬU CHO ĐẾN KHI ĐỦ)
+        -- BƯỚC B: FARM BLAZE EMBER
         do
             local invB, _ = GetInventory()
             local _, emberCount = HasItem(invB, "Blaze Ember")
@@ -485,63 +485,16 @@ do
                 ActionStatus.Text = "Hành động: [3.1-B] Blaze Ember đủ (" .. emberCount .. "/55), bỏ qua!"
                 task.wait(0.5)
             else
-                ActionStatus.Text = "Hành động: [3.1-B] Đang chạy luồng nhận Quest Dragon Hunter..."
+                ActionStatus.Text = "Hành động: [3.1-B] Blaze Ember thiếu (" .. emberCount .. "/55) → Farm..."
 
-                local DOJO_POS = CFrame.new(5813, 1208, 884)
-
-                local function ClaimDragonQuest()
-                    pcall(function()
-                        local Net = game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Net")
-                        Net:FindFirstChild("RF/InteractDragonQuest"):InvokeServer(unpack({
-                            [1] = {["NPC"] = "Dojo Trainer", ["Command"] = "ClaimQuest"}
-                        }))
-                    end)
-                end
-
-                local function CheckBackToDojoNotification()
-                    local found = false
-                    pcall(function()
-                        local notifications = Player.PlayerGui:FindFirstChild("Notifications")
-                        if notifications then
-                            for _, v in pairs(notifications:GetChildren()) do
-                                if v.Name == "NotificationTemplate" and v:FindFirstChild("Text") then
-                                    if string.find(v.Text, "Head back to the Dojo to complete more tasks") then
-                                        found = true
-                                        v:Destroy()
-                                        break
-                                    end
-                                end
-                            end
-                        end
-                    end)
-                    return found
-                end
-
-                -- Bước 1: Nhận nhiệm vụ lần đầu
-                TweenTo(DOJO_POS)
-                task.wait(0.5)
-                ClaimDragonQuest()
-                warn("[Draco] Đã nhận xong nhiệm vụ đầu. Delay 5s để chạy Banana...")
+                -- LOAD MÃ BỔ SUNG DRAGON HUNTER RỒI ĐỢI 5 GIÂY TRƯỚC KHI LOAD BANANAHUB
                 task.wait(5)
 
-                -- Luồng nhận lại quest chạy vĩnh cửu
-                task.spawn(function()
-                    while true do
-                        if CheckBackToDojoNotification() then
-                            warn("[Draco] Đã thấy thông báo Head back! Quay lại nhận quest mới...")
-                            TweenTo(DOJO_POS)
-                            task.wait(0.5)
-                            ClaimDragonQuest()
-                        end
-                        task.wait(1)
-                    end
-                end)
-
-                -- Bước 2: Chạy Banana Hub
                 LoadBananaHub({
                     ["Auto Quest Dragon Hunter"] = true,
                 })
 
+                local lastEmberCount = emberCount
                 repeat
                     task.wait(3)
                     local invLoop, _ = GetInventory()
