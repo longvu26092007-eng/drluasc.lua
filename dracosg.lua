@@ -551,9 +551,20 @@ do
             end
 
             local function CraftItem(itemName)
+                local args = {
+                    [1] = "Craft",
+                    [2] = itemName,
+                    [3] = 1,
+                    [4] = {}
+                }
                 local ok, res = pcall(function()
-                    return RFCraft:InvokeServer(unpack({[1]="Craft",[2]=itemName,[3]={}}))
+                    return RFCraft:InvokeServer(unpack(args))
                 end)
+                if not ok then 
+                    warn("[RF/Craft] Failed (" .. itemName .. "):", res) 
+                else 
+                    warn("[RF/Craft] Sent successfully (" .. itemName .. "):", res) 
+                end
                 return ok
             end
 
