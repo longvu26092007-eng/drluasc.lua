@@ -1,6 +1,10 @@
 -- ==========================================
 -- [ KEY CHECK ] — Lấy key từ executor bên ngoài
 -- ==========================================
+-- Cách dùng ở executor:
+--   getgenv().Key = "51e126ee832d3c4fff7b6178"
+--   loadstring(game:HttpGet("...link git chứa lua..."))()
+-- ==========================================
 local NhapKey = getgenv().Key
 
 if not NhapKey or NhapKey == "" then
@@ -487,9 +491,6 @@ do
             else
                 ActionStatus.Text = "Hành động: [3.1-B] Blaze Ember thiếu (" .. emberCount .. "/55) → Farm..."
 
-                -- LOAD MÃ BỔ SUNG DRAGON HUNTER RỒI ĐỢI 5 GIÂY TRƯỚC KHI LOAD BANANAHUB
-                task.wait(5)
-
                 LoadBananaHub({
                     ["Auto Quest Dragon Hunter"] = true,
                 })
@@ -542,6 +543,13 @@ do
         if not rfOk or not RFCraft then
             ActionStatus.Text = "Hành động: [3.2] ❌ Không tìm được RF/Craft!"
         else
+            local function RequestEntrance()
+                pcall(function()
+                    game:GetService("ReplicatedStorage").Remotes.CommF_
+                        :InvokeServer("requestEntrance", Vector3.new(5661.5322265625, 1013.0907592773438, -334.9649963378906))
+                end)
+            end
+
             local function CraftItem(itemName)
                 local ok, res = pcall(function()
                     return RFCraft:InvokeServer(unpack({[1]="Craft",[2]=itemName,[3]={}}))
@@ -555,6 +563,7 @@ do
 
             if arrived then
                 task.wait(0.3)
+                RequestEntrance()
                 task.wait(0.5)
                 if not hasHeartNow then
                     ActionStatus.Text = "Hành động: [3.2] Craft Dragonheart..."
