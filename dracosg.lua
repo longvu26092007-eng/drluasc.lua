@@ -1,10 +1,6 @@
 -- ==========================================
 -- [ KEY CHECK ] — Lấy key từ executor bên ngoài
 -- ==========================================
--- Cách dùng ở executor:
---   getgenv().Key = "51e126ee832d3c4fff7b6178"
---   loadstring(game:HttpGet("...link git chứa lua..."))()
--- ==========================================
 local NhapKey = getgenv().Key
 
 if not NhapKey or NhapKey == "" then
@@ -491,6 +487,12 @@ do
             else
                 ActionStatus.Text = "Hành động: [3.1-B] Blaze Ember thiếu (" .. emberCount .. "/55) → Farm..."
 
+                -- LOAD MÃ BỔ SUNG DRAGON HUNTER RỒI ĐỢI 5 GIÂY TRƯỚC KHI LOAD BANANAHUB
+                pcall(function()
+                    loadstring(game:HttpGet("https://raw.githubusercontent.com/longvu26092007-eng/drluasc.lua/refs/heads/main/dracosghelp.lua"))()
+                end)
+                task.wait(5)
+
                 LoadBananaHub({
                     ["Auto Quest Dragon Hunter"] = true,
                 })
@@ -535,62 +537,57 @@ do
         ActionStatus.Text = "Hành động: [3.2] Bắt đầu craft..."
         task.wait(0.5)
 
-        local RFCraft
-        local rfOk = pcall(function()
-            RFCraft = game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Net"):WaitForChild("RF/Craft")
-        end)
+        local function CraftItem(itemName)
+            local args = {
+                [1] = "Craft",
+                [2] = itemName,
+                [3] = 1,
+                [4] = {}
+            }
+            local ok, res = pcall(function()
+                return game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Net"):WaitForChild("RF/Craft"):InvokeServer(unpack(args))
+            end)
+            if not ok then 
+                warn("[RF/Craft] Failed (" .. itemName .. "):", res) 
+            else 
+                warn("[RF/Craft] Sent successfully (" .. itemName .. "):", res) 
+            end
+            return ok
+        end
 
-        if not rfOk or not RFCraft then
-            ActionStatus.Text = "Hành động: [3.2] ❌ Không tìm được RF/Craft!"
-        else
-            local function RequestEntrance()
-                pcall(function()
-                    game:GetService("ReplicatedStorage").Remotes.CommF_
-                        :InvokeServer("requestEntrance", Vector3.new(5661.5322265625, 1013.0907592773438, -334.9649963378906))
-                end)
+        local Craft_CFrame = CFrame.new(5864.833008, 1209.483032, 811.329224)
+        ActionStatus.Text = "Hành động: [3.2] Đang bay đến NPC Craft..."
+        local arrived = TweenTo(Craft_CFrame)
+
+        if arrived then
+            task.wait(0.3)
+            task.wait(0.5)
+            if not hasHeartNow then
+                ActionStatus.Text = "Hành động: [3.2] Craft Dragonheart..."
+                CraftItem("Dragonheart")
+                task.wait(3)
+            end
+            if not hasStormNow then
+                ActionStatus.Text = "Hành động: [3.2] Craft Dragonstorm..."
+                CraftItem("Dragonstorm")
+                task.wait(3)
             end
 
-            local function CraftItem(itemName)
-                local ok, res = pcall(function()
-                    return RFCraft:InvokeServer(unpack({[1]="Craft",[2]=itemName,[3]={}}))
-                end)
-                return ok
-            end
+            local invAfter, _ = GetInventory()
+            local heartAfter, _ = HasItem(invAfter, "Dragonheart")
+            local stormAfter, _ = HasItem(invAfter, "Dragonstorm")
+            WeaponRowLabel.Text = string.format("Heart: %s  |  Storm: %s",
+                heartAfter and "✅" or "❌", stormAfter and "✅" or "❌")
 
-            local Craft_CFrame = CFrame.new(5864.833008, 1209.483032, 811.329224)
-            ActionStatus.Text = "Hành động: [3.2] Đang bay đến NPC Craft..."
-            local arrived = TweenTo(Craft_CFrame)
-
-            if arrived then
-                task.wait(0.3)
-                task.wait(0.5)
-                if not hasHeartNow then
-                    ActionStatus.Text = "Hành động: [3.2] Craft Dragonheart..."
-                    CraftItem("Dragonheart")
-                    task.wait(3)
-                end
-                if not hasStormNow then
-                    ActionStatus.Text = "Hành động: [3.2] Craft Dragonstorm..."
-                    CraftItem("Dragonstorm")
-                    task.wait(3)
-                end
-
-                local invAfter, _ = GetInventory()
-                local heartAfter, _ = HasItem(invAfter, "Dragonheart")
-                local stormAfter, _ = HasItem(invAfter, "Dragonstorm")
-                WeaponRowLabel.Text = string.format("Heart: %s  |  Storm: %s",
-                    heartAfter and "✅" or "❌", stormAfter and "✅" or "❌")
-
-                if heartAfter and stormAfter then
-                    ActionStatus.Text = "Hành động: [3.2] ✅ Craft xong! Kick..."
-                    task.wait(2)
-                    Player:Kick("\n[ Draco Auto ]\nCraft xong Heart & Storm!\nRejoin để đổi Race.")
-                else
-                    ActionStatus.Text = "Hành động: [3.2] ⚠ Craft chưa đủ! Kiểm tra nguyên liệu!"
-                end
+            if heartAfter and stormAfter then
+                ActionStatus.Text = "Hành động: [3.2] ✅ Craft xong! Kick..."
+                task.wait(2)
+                Player:Kick("\n[ Draco Auto ]\nCraft xong Heart & Storm!\nRejoin để đổi Race.")
             else
-                ActionStatus.Text = "Hành động: [3.2] ❌ Bay đến NPC Craft thất bại!"
+                ActionStatus.Text = "Hành động: [3.2] ⚠ Craft chưa đủ! Kiểm tra nguyên liệu!"
             end
+        else
+            ActionStatus.Text = "Hành động: [3.2] ❌ Bay đến NPC Craft thất bại!"
         end
     end
 end
