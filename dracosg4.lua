@@ -58,6 +58,11 @@ local Character        = Player.Character
 local Humanoid         = Character and Character:FindFirstChild("Humanoid")
 local HumanoidRootPart = Character and Character:FindFirstChild("HumanoidRootPart")
 
+-- BIẾN STATUS ĐỂ HIỆN LÊN UI
+local CurrentQuestStatus = "Đang kiểm tra..."
+local CurrentActionStatus = "Đang khởi động..."
+local CurrentLocationStatus = "Đang đứng yên"
+
 Player.CharacterAdded:Connect(function(v)
     Character        = v
     Humanoid         = v:WaitForChild("Humanoid")
@@ -65,11 +70,12 @@ Player.CharacterAdded:Connect(function(v)
 end)
 
 -- ==========================================
--- [TWEEN] — Di chuyển xa (đã fix chống đè Tween)
+-- [TWEEN] — Di chuyển xa (Bypass AntiCheat)
 -- ==========================================
 local _activeTween = nil
 
-local function TweenTo(targetCFrame)
+local function TweenTo(targetCFrame, locationName)
+    CurrentLocationStatus = "Bay đến: " .. (locationName or "Tọa độ lạ")
     local chr = Player.Character
     if not chr or not chr:FindFirstChild("HumanoidRootPart") then return false end
     local hrp = chr:WaitForChild("HumanoidRootPart")
@@ -78,6 +84,7 @@ local function TweenTo(targetCFrame)
     local dist = (hrp.Position - targetCFrame.Position).Magnitude
     if dist <= 150 then 
         hrp.CFrame = targetCFrame
+        CurrentLocationStatus = "Đã đến: " .. (locationName or "Đểm đích")
         return true 
     end
 
@@ -102,11 +109,12 @@ local function TweenTo(targetCFrame)
     
     if noclip then noclip:Disconnect() end
     if hum and hum.Parent and hum.Health > 0 then hum:ChangeState(8) end
+    CurrentLocationStatus = "Đã đến: " .. (locationName or "Điểm đích")
     return true
 end
 
 -- ==========================================
--- [FAST ATTACK] — KaitunBoss encrypted hit registration
+-- [FAST ATTACK] — KaitunBoss encrypted hit
 -- ==========================================
 local remoteAttack, idremote
 local seed = ReplicatedStorage.Modules.Net.seed:InvokeServer()
@@ -162,11 +170,9 @@ local function AttackNoCoolDown()
         if not chr then return end
         local equippedWeapon = chr:FindFirstChildWhichIsA("Tool")
         if not equippedWeapon then return end
-
         local targets = {}
         local mainTarget = nil
         local playerPos = chr:GetPivot().Position
-
         for _, enemy in ipairs(workspace.Enemies:GetChildren()) do
             if not enemy:GetAttribute("IsBoat") then
                 local eh = enemy:FindFirstChild("Humanoid")
@@ -178,7 +184,6 @@ local function AttackNoCoolDown()
             end
         end
         if not mainTarget then return end
-
         local storage = ReplicatedStorage
         local attackEvent = storage:WaitForChild("Modules"):WaitForChild("Net"):WaitForChild("RE/RegisterAttack")
         local hitEvent = storage:WaitForChild("Modules"):WaitForChild("Net"):WaitForChild("RE/RegisterHit")
@@ -188,7 +193,7 @@ local function AttackNoCoolDown()
 end
 
 -- ==========================================
--- [EQUIP TOOL & AUTO HAKI & PRESS KEY]
+-- [HELPERS: HAKI, TOOL, SKILL]
 -- ==========================================
 local function EquipTool(toolTip)
     if not Character then return end
@@ -234,7 +239,7 @@ local function equipAndUseSkill(toolType)
 end
 
 -- ==========================================
--- [FLOAT SYSTEM] — Ngăn lỗi Yo-yo
+-- [FLOAT SYSTEM] — Chống bay giật Yo-yo
 -- ==========================================
 local _floatConn   = nil
 local _floatTarget = nil
@@ -248,17 +253,13 @@ local function StartFloat()
             local hrp = chr:FindFirstChild("HumanoidRootPart")
             local hum = chr:FindFirstChild("Humanoid")
             if not hrp or not hum or hum.Health <= 0 then return end
-            
             if _floatTarget then
                 hrp.CFrame = _floatTarget
             end
-            
             hum.Sit = false
             hum:ChangeState(11)
             for _, part in pairs(chr:GetDescendants()) do
-                if part:IsA("BasePart") and part.CanCollide then
-                    part.CanCollide = false
-                end
+                if part:IsA("BasePart") and part.CanCollide then part.CanCollide = false end
             end
         end)
     end)
@@ -274,21 +275,19 @@ local function StopFloat()
     end)
 end
 
--- HÀM MỚI: Tự động Tween nếu vị trí quá xa (Chống Yo-yo)
-local function SafeGoTo(targetCFrame)
+local function SafeGoTo(targetCFrame, locationName)
     local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
-
     if (hrp.Position - targetCFrame.Position).Magnitude > 50 then
         StopFloat()
-        TweenTo(targetCFrame)
+        TweenTo(targetCFrame, locationName)
         StartFloat()
     end
     _floatTarget = targetCFrame
 end
 
 -- ==========================================
--- [BRING ENEMY & FIND MOB & KILL]
+-- [GOM QUÁI & DIỆT QUÁI]
 -- ==========================================
 local function BringEnemy(targetModel)
     pcall(function()
@@ -296,42 +295,14 @@ local function BringEnemy(targetModel)
         local vh = targetModel:FindFirstChild("Humanoid")
         local vhrp = targetModel:FindFirstChild("HumanoidRootPart")
         if not vh or not vhrp or vh.Health <= 0 then return end
-
         vhrp.Size = Vector3.new(60, 60, 60)
         vhrp.Transparency = 1
         vh.JumpPower = 0
         vh.WalkSpeed = 0
         vhrp.CanCollide = false
-
-        if vh:FindFirstChild("Animator") then
-            vh.Animator:Destroy()
-        end
+        if vh:FindFirstChild("Animator") then vh.Animator:Destroy() end
     end)
 end
-
-local function FindClosestMob(mobNames)
-    local closest = nil
-    local closestDist = math.huge
-    if not HumanoidRootPart then return nil end
-    for _, enemy in pairs(workspace.Enemies:GetChildren()) do
-        local eh = enemy:FindFirstChild("Humanoid")
-        local ehrp = enemy:FindFirstChild("HumanoidRootPart")
-        if eh and ehrp and eh.Health > 0 then
-            for _, name in ipairs(mobNames) do
-                if enemy.Name == name then
-                    local d = (ehrp.Position - HumanoidRootPart.Position).Magnitude
-                    if d < closestDist then
-                        closestDist = d
-                        closest = enemy
-                    end
-                end
-            end
-        end
-    end
-    return closest
-end
-
-local lastKenCall = tick()
 
 local function KillOneMonster(targetModel)
     xpcall(function()
@@ -340,12 +311,10 @@ local function KillOneMonster(targetModel)
         local vhrp = targetModel:FindFirstChild("HumanoidRootPart")
         if not vh or vh.Health <= 0 or not vhrp then return end
 
-        -- Bay an toàn tới quái để chống giật
+        CurrentActionStatus = "Đang chém: " .. targetModel.Name
         local attackCFrame = vhrp.CFrame * CFrame.new(0, 20, 0)
-        SafeGoTo(attackCFrame)
-
+        SafeGoTo(attackCFrame, "Vùng chém quái")
         BringEnemy(targetModel)
-
         EquipTool("Melee")
         AttackNoCoolDown()
         FastAttack(targetModel.Name)
@@ -361,38 +330,29 @@ end
 -- [HỆ THỐNG QUEST VÀ NPC]
 -- ==========================================
 local function checkQuesta()
-    local hasQuest  = false
-    local mobName   = nil
-    local questCount = nil
-    local questType = nil
-
+    local hasQuest, mobName, questCount, questType = false, nil, nil, nil
     pcall(function()
         local Net = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
         local RF = Net:WaitForChild("RF/DragonHunter")
-
-        pcall(function()
-            RF:InvokeServer(unpack({[1] = {["Context"] = "RequestQuest"}}))
-        end)
-
+        pcall(function() RF:InvokeServer(unpack({[1] = {["Context"] = "RequestQuest"}})) end)
         local questData = RF:InvokeServer(unpack({[1] = {["Context"] = "Check"}}))
-
         if questData and questData.Text then
             hasQuest = true
             local txt = tostring(questData.Text)
-
             if string.find(txt, "Defeat") then
                 questType = 1
                 questCount = tonumber(string.sub(txt, 8, 9))
                 for _, m in pairs({"Hydra Enforcer", "Venomous Assailant"}) do
-                    if string.find(txt, m) then
-                        mobName = m
-                        break
-                    end
+                    if string.find(txt, m) then mobName = m; break end
                 end
+                CurrentQuestStatus = "Đánh quái: " .. mobName .. " (" .. questCount .. ")"
             elseif string.find(txt, "Destroy") then
                 questType = 2
                 questCount = 10
+                CurrentQuestStatus = "Đốn cây trúc (10 cây)"
             end
+        else
+            CurrentQuestStatus = "Không có nhiệm vụ"
         end
     end)
     return hasQuest, mobName, questCount, questType
@@ -402,10 +362,8 @@ local function BackTODoJo()
     local result = false
     pcall(function()
         for _, b in pairs(Player.PlayerGui.Notifications:GetChildren()) do
-            if b.Name == "NotificationTemplate" then
-                if string.find(b.Text, "Head back to the Dojo to complete more tasks") then
-                    result = true
-                end
+            if b.Name == "NotificationTemplate" and string.find(b.Text, "Head back to the Dojo") then
+                result = true
             end
         end
     end)
@@ -413,6 +371,7 @@ local function BackTODoJo()
 end
 
 local function ClaimQuest()
+    CurrentActionStatus = "Đang trả nhiệm vụ..."
     pcall(function()
         local Net = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
         Net:FindFirstChild("RF/InteractDragonQuest"):InvokeServer(unpack({
@@ -421,14 +380,51 @@ local function ClaimQuest()
     end)
 end
 
-local function RequestEntrance()
-    pcall(function()
-        COMMF_:InvokeServer("requestEntrance", Vector3.new(5661.5322265625, 1013.0907592773438, -334.9649963378906))
-    end)
+-- ==========================================
+-- [PHẦN 2] GIAO DIỆN MONITOR (VÀNG - ĐEN)
+-- ==========================================
+if CoreGui:FindFirstChild("DracoAutoUI") then CoreGui.DracoAutoUI:Destroy() end
+local ScreenGui = Instance.new("ScreenGui", CoreGui); ScreenGui.Name = "DracoAutoUI"
+
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 450, 0, 240); MainFrame.Position = UDim2.new(0.5, -225, 0.5, -120)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15); MainFrame.Active = true; MainFrame.Draggable = true
+Instance.new("UIStroke", MainFrame).Color = Color3.fromRGB(255, 200, 0)
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 35); Title.Text = " Draco Hub VuNguyen - Dragon Hunter"
+Title.TextColor3 = Color3.fromRGB(255, 200, 0); Title.BackgroundTransparency = 1
+Title.Font = Enum.Font.GothamBold; Title.TextSize = 14; Title.TextXAlignment = Enum.TextXAlignment.Center
+
+local InfoPanel = Instance.new("Frame", MainFrame)
+InfoPanel.Size = UDim2.new(1, -20, 1, -50); InfoPanel.Position = UDim2.new(0, 10, 0, 40); InfoPanel.BackgroundTransparency = 1
+
+local function CreateLabel(text, pos)
+    local lbl = Instance.new("TextLabel", InfoPanel)
+    lbl.Size = UDim2.new(1, 0, 0, 25); lbl.Position = UDim2.new(0, 0, 0, pos)
+    lbl.Text = text; lbl.TextColor3 = Color3.fromRGB(255, 255, 255); lbl.Font = Enum.Font.GothamBold
+    lbl.BackgroundTransparency = 1; lbl.TextSize = 13; lbl.TextXAlignment = Enum.TextXAlignment.Left
+    return lbl
 end
 
+local QuestLabel = CreateLabel("Nhiệm vụ: ...", 0)
+local LocationLabel = CreateLabel("Vị trí: ...", 30)
+local ActionLabel = CreateLabel("Hành động: ...", 60)
+local MasteryLabel = CreateLabel("Mastery: Đang kiểm tra...", 90)
+local EmberLabel = CreateLabel("Ember Status: Đang chờ...", 120)
+
+task.spawn(function()
+    while true do
+        QuestLabel.Text = "Nhiệm vụ: " .. CurrentQuestStatus
+        LocationLabel.Text = "Vị trí: " .. CurrentLocationStatus
+        ActionLabel.Text = "Hành động: " .. CurrentActionStatus
+        task.wait(0.5)
+    end
+end)
+
 -- ==========================================
--- [CONSTANTS]
+-- [CONSTANTS & THREADS]
 -- ==========================================
 local DOJO_POS   = CFrame.new(5813, 1208, 884)
 local HYDRA_POS  = CFrame.new(4612.078125, 1002.283447265625, 498.2188720703125)
@@ -440,16 +436,13 @@ local TREE_TARGETS = {
     CFrame.new(5258.96484375, 1004.1998901367188, 345.5052490234375),
 }
 
--- ==========================================
--- [THREADS] — Quest, Ember, Haki
--- ==========================================
 local _questThreadRunning = false
 local _isCollectingEmber = false
 
 local function StartQuestThread()
     if _questThreadRunning then return end
     _questThreadRunning = true
-    RequestEntrance()
+    pcall(function() COMMF_:InvokeServer("requestEntrance", Vector3.new(5661.5322265625, 1013.0907592773438, -334.9649963378906)) end)
     task.spawn(function()
         while _questThreadRunning and _G.FarmBlazeEM do
             pcall(function()
@@ -460,144 +453,90 @@ local function StartQuestThread()
                     RF:InvokeServer(unpack({[1] = {["Context"] = "Check"}}))
                 end
             end)
-            task.wait(1)
+            task.wait(2)
         end
         _questThreadRunning = false
     end)
 end
 
-local function StopQuestThread()
-    _questThreadRunning = false
-end
-
-local _emberThreadRunning = false
-local function StartEmberThread()
-    if _emberThreadRunning then return end
-    _emberThreadRunning = true
-    task.spawn(function()
-        while _emberThreadRunning and _G.FarmBlazeEM do
+task.spawn(function()
+    while true do
+        if _G.FarmBlazeEM then
             pcall(function()
                 local ember = workspace:FindFirstChild("EmberTemplate")
                 if ember and ember:FindFirstChild("Part") then
                     _isCollectingEmber = true
-                    SafeGoTo(ember.Part.CFrame)
+                    EmberLabel.Text = "Ember Status: ĐANG NHẶT EMBER!"
+                    EmberLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+                    SafeGoTo(ember.Part.CFrame, "Chỗ Blaze Ember rơi")
                 else
                     _isCollectingEmber = false
+                    EmberLabel.Text = "Ember Status: Đang chờ rơi..."
+                    EmberLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
                 end
             end)
-            task.wait(0.1)
         end
-        _emberThreadRunning = false
-    end)
-end
-
-local function StopEmberThread()
-    _emberThreadRunning = false
-end
-
-task.spawn(function()
-    while true do
-        if _G.FarmBlazeEM then AutoHaki() end
-        task.wait(4)
+        task.wait(0.1)
     end
 end)
 
 -- ==========================================
 -- [MAIN LOOP] — Farm Dragon Hunter
 -- ==========================================
-_G.FarmBlazeEM = _G.FarmBlazeEM or false
+_G.FarmBlazeEM = true -- Bật mặc định
 
 spawn(function()
     while task.wait(0.2) do
         if _G.FarmBlazeEM then
             pcall(function()
                 StartQuestThread()
-                StartEmberThread()
                 StartFloat()
-
-                -- Bỏ qua thao tác đánh/nhận quest nếu đang nhặt Ember
                 if _isCollectingEmber then return end
 
                 local hasQuest, mobName, questCount, questType = checkQuesta()
 
                 if hasQuest and not BackTODoJo() then
-                    -- LOẠI 1: ĐÁNH QUÁI
                     if questType == 1 then
-                        if mobName == "Hydra Enforcer" or mobName == "Venomous Assailant" then
-                            local target = FindClosestMob({mobName})
-                            if target then
-                                repeat
-                                    if not _isCollectingEmber then
-                                        KillOneMonster(target)
-                                    end
-                                    task.wait(0.15)
-                                until not _G.FarmBlazeEM
-                                    or not target or not target.Parent
-                                    or not target:FindFirstChild("Humanoid")
-                                    or target.Humanoid.Health <= 0
-                                    or BackTODoJo()
-                            else
-                                SafeGoTo(HYDRA_POS * CFrame.new(0, 20, 0))
-                            end
+                        local target = FindClosestMob({mobName})
+                        if target then
+                            repeat
+                                if not _isCollectingEmber then KillOneMonster(target) end
+                                task.wait(0.15)
+                            until not _G.FarmBlazeEM or not target or not target.Parent or target.Humanoid.Health <= 0 or BackTODoJo()
+                        else
+                            CurrentActionStatus = "Đang đợi " .. mobName .. " spawn..."
+                            SafeGoTo(HYDRA_POS * CFrame.new(0, 20, 0), "Vùng Hydra Island")
                         end
-
-                    -- LOẠI 2: ĐỐN CÂY (FIX LỖI BỊ VĂNG SKILL TẠI ĐÂY)
                     elseif questType == 2 then
-                        StopFloat() 
-
-                        for _, treePos in ipairs(TREE_TARGETS) do
-                            if not _G.FarmBlazeEM then break end
-                            if BackTODoJo() then break end
-
-                            TweenTo(treePos)
-                            task.wait(0.3)
-
+                        for i, treePos in ipairs(TREE_TARGETS) do
+                            if not _G.FarmBlazeEM or BackTODoJo() or _isCollectingEmber then break end
+                            CurrentActionStatus = "Đang đốn cây thứ " .. i
+                            TweenTo(treePos, "Cây trúc số " .. i)
+                            task.wait(0.2)
                             local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
                             if hrp and (hrp.Position - treePos.Position).Magnitude <= 50 then
-                                -- ĐÓNG BĂNG NHÂN VẬT VÀ XOAY MẶT VÀO CÂY
                                 pcall(function()
                                     hrp.Anchored = true
                                     hrp.CFrame = CFrame.new(hrp.Position, treePos.Position)
                                 end)
-                                
-                                AutoHaki()
-                                equipAndUseSkill("Melee")
-                                equipAndUseSkill("Sword")
-                                equipAndUseSkill("Gun")
-
-                                -- XẢ XONG THÌ MỞ KHÓA
-                                pcall(function()
-                                    if hrp then hrp.Anchored = false end
-                                end)
+                                AutoHaki(); equipAndUseSkill("Melee"); equipAndUseSkill("Sword"); equipAndUseSkill("Gun")
+                                pcall(function() if hrp then hrp.Anchored = false end end)
                             end
                         end
-
-                        StartFloat()
                     end
-
-                -- VỀ DOJO NHẬN / TRẢ QUEST
                 else
                     StopFloat()
-
                     if BackTODoJo() then
-                        TweenTo(DOJO_POS)
-                        task.wait(0.5)
+                        CurrentQuestStatus = "Hoàn thành! Về trả quest."
+                        TweenTo(DOJO_POS, "Dojo Trainer")
                         ClaimQuest()
-                        task.wait(0.5)
                     else
-                        TweenTo(DOJO_POS)
-                        task.wait(0.5)
+                        CurrentActionStatus = "Đang bay về Dojo nhận Quest..."
+                        TweenTo(DOJO_POS, "Dojo Trainer")
                     end
-
                     StartFloat()
                 end
             end)
-        else
-            StopFloat()
-            StopQuestThread()
-            StopEmberThread()
         end
     end
 end)
-
-warn("[DragonHunter] ✅ Script loaded! Đã fix lỗi Yo-yo và văng skill. Set _G.FarmBlazeEM = true to start.")
