@@ -70,7 +70,7 @@ local function TweenTo(targetCFrame)
     bv.Velocity = Vector3.new(0, 0, 0)
     bv.Parent   = hrp
 
-    local speed    = 300
+    local speed    = 320
     local time     = distance / speed
     local tweenObj = TweenService:Create(hrp, TweenInfo.new(time, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
 
@@ -477,7 +477,7 @@ do
             end
         end
 
-        -- BƯỚC B: FARM BLAZE EMBER
+        -- BƯỚC B: FARM BLAZE EMBER (CHẠY VÒNG LẶP VĨNH CỬU CHO ĐẾN KHI ĐỦ)
         do
             local invB, _ = GetInventory()
             local _, emberCount = HasItem(invB, "Blaze Ember")
@@ -485,19 +485,63 @@ do
                 ActionStatus.Text = "Hành động: [3.1-B] Blaze Ember đủ (" .. emberCount .. "/55), bỏ qua!"
                 task.wait(0.5)
             else
-                ActionStatus.Text = "Hành động: [3.1-B] Blaze Ember thiếu (" .. emberCount .. "/55) → Farm..."
+                ActionStatus.Text = "Hành động: [3.1-B] Đang chạy luồng nhận Quest Dragon Hunter..."
 
-                -- LOAD MÃ BỔ SUNG DRAGON HUNTER RỒI ĐỢI 5 GIÂY TRƯỚC KHI LOAD BANANAHUB
-                pcall(function()
-                    loadstring(game:HttpGet("https://raw.githubusercontent.com/longvu26092007-eng/drluasc.lua/refs/heads/main/dracosghelp.lua"))()
-                end)
+                local DOJO_POS = CFrame.new(5813, 1208, 884)
+
+                local function ClaimDragonQuest()
+                    pcall(function()
+                        local Net = game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Net")
+                        Net:FindFirstChild("RF/InteractDragonQuest"):InvokeServer(unpack({
+                            [1] = {["NPC"] = "Dojo Trainer", ["Command"] = "ClaimQuest"}
+                        }))
+                    end)
+                end
+
+                local function CheckBackToDojoNotification()
+                    local found = false
+                    pcall(function()
+                        local notifications = Player.PlayerGui:FindFirstChild("Notifications")
+                        if notifications then
+                            for _, v in pairs(notifications:GetChildren()) do
+                                if v.Name == "NotificationTemplate" and v:FindFirstChild("Text") then
+                                    if string.find(v.Text, "Head back to the Dojo to complete more tasks") then
+                                        found = true
+                                        v:Destroy()
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                    return found
+                end
+
+                -- Bước 1: Nhận nhiệm vụ lần đầu
+                TweenTo(DOJO_POS)
+                task.wait(0.5)
+                ClaimDragonQuest()
+                warn("[Draco] Đã nhận xong nhiệm vụ đầu. Delay 5s để chạy Banana...")
                 task.wait(5)
 
+                -- Luồng nhận lại quest chạy vĩnh cửu
+                task.spawn(function()
+                    while true do
+                        if CheckBackToDojoNotification() then
+                            warn("[Draco] Đã thấy thông báo Head back! Quay lại nhận quest mới...")
+                            TweenTo(DOJO_POS)
+                            task.wait(0.5)
+                            ClaimDragonQuest()
+                        end
+                        task.wait(1)
+                    end
+                end)
+
+                -- Bước 2: Chạy Banana Hub
                 LoadBananaHub({
                     ["Auto Quest Dragon Hunter"] = true,
                 })
 
-                local lastEmberCount = emberCount
                 repeat
                     task.wait(3)
                     local invLoop, _ = GetInventory()
@@ -537,57 +581,55 @@ do
         ActionStatus.Text = "Hành động: [3.2] Bắt đầu craft..."
         task.wait(0.5)
 
-        local function CraftItem(itemName)
-            local args = {
-                [1] = "Craft",
-                [2] = itemName,
-                [3] = 1,
-                [4] = {}
-            }
-            local ok, res = pcall(function()
-                return game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Net"):WaitForChild("RF/Craft"):InvokeServer(unpack(args))
-            end)
-            if not ok then 
-                warn("[RF/Craft] Failed (" .. itemName .. "):", res) 
-            else 
-                warn("[RF/Craft] Sent successfully (" .. itemName .. "):", res) 
-            end
-            return ok
-        end
+        local RFCraft
+        local rfOk = pcall(function()
+            RFCraft = game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Net"):WaitForChild("RF/Craft")
+        end)
 
-        local Craft_CFrame = CFrame.new(5864.833008, 1209.483032, 811.329224)
-        ActionStatus.Text = "Hành động: [3.2] Đang bay đến NPC Craft..."
-        local arrived = TweenTo(Craft_CFrame)
-
-        if arrived then
-            task.wait(0.3)
-            task.wait(0.5)
-            if not hasHeartNow then
-                ActionStatus.Text = "Hành động: [3.2] Craft Dragonheart..."
-                CraftItem("Dragonheart")
-                task.wait(3)
-            end
-            if not hasStormNow then
-                ActionStatus.Text = "Hành động: [3.2] Craft Dragonstorm..."
-                CraftItem("Dragonstorm")
-                task.wait(3)
-            end
-
-            local invAfter, _ = GetInventory()
-            local heartAfter, _ = HasItem(invAfter, "Dragonheart")
-            local stormAfter, _ = HasItem(invAfter, "Dragonstorm")
-            WeaponRowLabel.Text = string.format("Heart: %s  |  Storm: %s",
-                heartAfter and "✅" or "❌", stormAfter and "✅" or "❌")
-
-            if heartAfter and stormAfter then
-                ActionStatus.Text = "Hành động: [3.2] ✅ Craft xong! Kick..."
-                task.wait(2)
-                Player:Kick("\n[ Draco Auto ]\nCraft xong Heart & Storm!\nRejoin để đổi Race.")
-            else
-                ActionStatus.Text = "Hành động: [3.2] ⚠ Craft chưa đủ! Kiểm tra nguyên liệu!"
-            end
+        if not rfOk or not RFCraft then
+            ActionStatus.Text = "Hành động: [3.2] ❌ Không tìm được RF/Craft!"
         else
-            ActionStatus.Text = "Hành động: [3.2] ❌ Bay đến NPC Craft thất bại!"
+            local function CraftItem(itemName)
+                local ok, res = pcall(function()
+                    return RFCraft:InvokeServer(unpack({[1]="Craft",[2]=itemName,[3]={}}))
+                end)
+                return ok
+            end
+
+            local Craft_CFrame = CFrame.new(5864.833008, 1209.483032, 811.329224)
+            ActionStatus.Text = "Hành động: [3.2] Đang bay đến NPC Craft..."
+            local arrived = TweenTo(Craft_CFrame)
+
+            if arrived then
+                task.wait(0.3)
+                task.wait(0.5)
+                if not hasHeartNow then
+                    ActionStatus.Text = "Hành động: [3.2] Craft Dragonheart..."
+                    CraftItem("Dragonheart")
+                    task.wait(3)
+                end
+                if not hasStormNow then
+                    ActionStatus.Text = "Hành động: [3.2] Craft Dragonstorm..."
+                    CraftItem("Dragonstorm")
+                    task.wait(3)
+                end
+
+                local invAfter, _ = GetInventory()
+                local heartAfter, _ = HasItem(invAfter, "Dragonheart")
+                local stormAfter, _ = HasItem(invAfter, "Dragonstorm")
+                WeaponRowLabel.Text = string.format("Heart: %s  |  Storm: %s",
+                    heartAfter and "✅" or "❌", stormAfter and "✅" or "❌")
+
+                if heartAfter and stormAfter then
+                    ActionStatus.Text = "Hành động: [3.2] ✅ Craft xong! Kick..."
+                    task.wait(2)
+                    Player:Kick("\n[ Draco Auto ]\nCraft xong Heart & Storm!\nRejoin để đổi Race.")
+                else
+                    ActionStatus.Text = "Hành động: [3.2] ⚠ Craft chưa đủ! Kiểm tra nguyên liệu!"
+                end
+            else
+                ActionStatus.Text = "Hành động: [3.2] ❌ Bay đến NPC Craft thất bại!"
+            end
         end
     end
 end
