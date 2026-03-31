@@ -6,6 +6,46 @@
 
 if getgenv().TC then pcall(getgenv().TC) end
 
+-- ==========================================
+-- [ ĐỢI GAME LOAD → TEAM → SCRIPT ]
+-- ==========================================
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
+repeat task.wait() until game.Players.LocalPlayer
+repeat task.wait() until game.Players.LocalPlayer:FindFirstChild("PlayerGui")
+
+-- Đợi chọn team
+if game.Players.LocalPlayer.Team == nil then
+    repeat
+        task.wait()
+        for _, v in pairs(game.Players.LocalPlayer.PlayerGui:GetChildren()) do
+            if string.find(v.Name, "Main") then
+                pcall(function()
+                    local teamName = getgenv().Team or "Marines"
+                    local teamBtn = v.ChooseTeam.Container[teamName].Frame.TextButton
+                    teamBtn.Size     = UDim2.new(0, 10000, 0, 10000)
+                    teamBtn.Position = UDim2.new(-4, 0, -5, 0)
+                    teamBtn.BackgroundTransparency = 1
+                    task.wait(0.5)
+                    game:GetService("VirtualInputManager"):SendMouseButtonEvent(0, 0, 0, true, game, 1)
+                    task.wait(0.05)
+                    game:GetService("VirtualInputManager"):SendMouseButtonEvent(0, 0, 0, false, game, 1)
+                end)
+            end
+        end
+    until game.Players.LocalPlayer.Team ~= nil and game:IsLoaded()
+    task.wait(3)
+end
+
+repeat task.wait() until game.Players.LocalPlayer.Character
+    and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+task.wait(2)
+
+-- ==========================================
+-- [ SCRIPT BẮT ĐẦU ]
+-- ==========================================
+
 local player = game:GetService("Players").LocalPlayer
 local UIS = game:GetService("UserInputService")
 local playerGui = player:WaitForChild("PlayerGui")
