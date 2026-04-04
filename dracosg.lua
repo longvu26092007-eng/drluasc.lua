@@ -392,7 +392,7 @@ local function HasItem(invData, itemName)
     return false, 0
 end
 -- ==========================================
--- [ 3.1 ] LUỒNG CHÍNH — CHECK HEART & STORM ← GIỮ NGUYÊN
+-- [ 3.1 ] LUỒNG CHÍNH — CHECK HEART & STORM ← GIỮ NGUYÊN (CHỈ SỬA PHẦN BLAZE EMBER)
 -- ==========================================
 do
     local inv, _ = GetInventory()
@@ -420,7 +420,7 @@ do
         task.wait(1)
         local SCALE_MIN = 5
         local EMBER_MIN = 55
-        -- BƯỚC A: FARM DRAGON SCALE
+        -- BƯỚC A: FARM DRAGON SCALE ← GIỮ NGUYÊN
         do
             local invA, _ = GetInventory()
             local _, scaleCount = HasItem(invA, "Dragon Scale")
@@ -449,7 +449,7 @@ do
                 until nowScale >= SCALE_MIN
             end
         end
-        -- BƯỚC B: FARM BLAZE EMBER
+        -- BƯỚC B: FARM BLAZE EMBER ← ĐÃ THÊM TIMER 5 PHÚT SHUTDOWN
         do
             local invB, _ = GetInventory()
             local _, emberCount = HasItem(invB, "Blaze Ember")
@@ -462,11 +462,25 @@ do
                     ["Auto Quest Dragon Hunter"] = true,
                 })
                 local lastEmberCount = emberCount
+                local blazeEmberStartTick = tick()  -- Bắt đầu đếm thời gian
                 repeat
                     task.wait(3)
                     local invLoop, _ = GetInventory()
                     local _, nowEmber = HasItem(invLoop, "Blaze Ember")
                     ActionStatus.Text = string.format("Hành động: [3.1-B] Đang farm Blaze Ember (%d/55)...", nowEmber)
+
+                    -- Reset timer nếu ember tăng (có progress)
+                    if nowEmber > lastEmberCount then
+                        blazeEmberStartTick = tick()
+                    end
+
+                    -- Nếu 5 phút (300 giây) không tăng ember nào thì shutdown
+                    if tick() - blazeEmberStartTick >= 300 then
+                        warn("[DracoAuto] 5 phút farm Blaze Ember không progress → Shutdown game!")
+                        game:Shutdown()
+                        break
+                    end
+
                     if lastEmberCount < EMBER_MIN and nowEmber >= EMBER_MIN then
                         ActionStatus.Text = "Hành động: [3.1-B] ✅ Đủ 55/55 Blaze Ember! Kick..."
                         task.wait(2)
