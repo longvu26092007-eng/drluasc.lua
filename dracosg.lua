@@ -2,19 +2,17 @@
 -- [ KEY CHECK ] — Lấy key từ executor bên ngoài
 -- ==========================================
 -- Cách dùng ở executor:
---   getgenv().Key = "51e126ee832d3c4fff7b6178"
---   loadstring(game:HttpGet("...link git chứa lua..."))()
+-- getgenv().Key = "51e126ee832d3c4fff7b6178"
+-- loadstring(game:HttpGet("...link git chứa lua..."))()
 -- ==========================================
 local NhapKey = getgenv().Key
-
 if not NhapKey or NhapKey == "" then
     warn("[DracoAuto] ❌ Chưa set getgenv().Key ở executor! Hủy script.")
     return
 end
 warn("[DracoAuto] ✅ Key nhận được: " .. string.sub(NhapKey, 1, 6) .. "***")
-
 -- ==========================================
--- [ PHẦN 0 : CHỌN TEAM & ĐỢI GAME LOAD ]
+-- [ PHẦN 0 : CHỌN TEAM & ĐỢI GAME LOAD ] ← ĐÃ SỬA SẠCH
 -- ==========================================
 getgenv().Team = getgenv().Team or "Marines"
 if not game:IsLoaded() then
@@ -22,62 +20,79 @@ if not game:IsLoaded() then
 end
 repeat task.wait() until game.Players.LocalPlayer
 repeat task.wait() until game.Players.LocalPlayer:FindFirstChild("PlayerGui")
-if game.Players.LocalPlayer.Team == nil then
-    repeat
-        task.wait()
-        for _, v in pairs(game.Players.LocalPlayer.PlayerGui:GetChildren()) do
-            if string.find(v.Name, "Main") then
-                pcall(function()
-                    local teamBtn = v.ChooseTeam.Container[getgenv().Team].Frame.TextButton
-                    teamBtn.Size     = UDim2.new(0, 10000, 0, 10000)
-                    teamBtn.Position = UDim2.new(-4, 0, -5, 0)
-                    teamBtn.BackgroundTransparency = 1
-                    task.wait(0.5)
-                    game:GetService("VirtualInputManager"):SendMouseButtonEvent(0,0,0,true,game,1)
-                    task.wait(0.05)
-                    game:GetService("VirtualInputManager"):SendMouseButtonEvent(0,0,0,false,game,1)
-                    task.wait(0.05)
-                end)
-            end
+
+local function JoinTeam()
+    local player = game.Players.LocalPlayer
+    if player.Team ~= nil then
+        warn("[DracoAuto] ✅ Đã có team: " .. player.Team.Name)
+        return
+    end
+    warn("[DracoAuto] Đang join team:", getgenv().Team)
+    -- Ưu tiên Remote (ổn định nhất)
+    local success = pcall(function()
+        game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("SetTeam", getgenv().Team)
+    end)
+    if success then
+        warn("[DracoAuto] ✅ Join team thành công bằng Remote")
+        task.wait(1.5)
+        return
+    end
+    -- Fallback click UI (chính xác hơn)
+    warn("[DracoAuto] Remote thất bại, thử click UI...")
+    repeat task.wait(0.5) until player.PlayerGui:FindFirstChild("Main")
+    for _, v in pairs(player.PlayerGui:GetChildren()) do
+        if v.Name:find("Main") and v:FindFirstChild("ChooseTeam") then
+            pcall(function()
+                local container = v.ChooseTeam.Container
+                if container and container:FindFirstChild(getgenv().Team) then
+                    local btn = container[getgenv().Team].Frame.TextButton
+                    local vim = game:GetService("VirtualInputManager")
+                    local x = btn.AbsolutePosition.X + btn.AbsoluteSize.X / 2
+                    local y = btn.AbsolutePosition.Y + btn.AbsoluteSize.Y / 2
+                    vim:SendMouseButtonEvent(x, y, 0, true, game, 1)
+                    task.wait(0.1)
+                    vim:SendMouseButtonEvent(x, y, 0, false, game, 1)
+                    warn("[DracoAuto] Đã click button team:", getgenv().Team)
+                end
+            end)
         end
-    until game.Players.LocalPlayer.Team ~= nil and game:IsLoaded()
-    task.wait(3)
+    end
+    task.wait(2)
 end
+
+JoinTeam()
+repeat task.wait(0.3) until game.Players.LocalPlayer.Team ~= nil
+task.wait(1.5)
+warn("[DracoAuto] ✅ Đã join team:", game.Players.LocalPlayer.Team.Name)
+-- ==========================================
 repeat task.wait() until game.Players.LocalPlayer.Character
     and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 task.wait(2)
-
 -- ==========================================
--- [ PHẦN 1 ] LÕI LOGIC (CORE)
+-- [ PHẦN 1 ] LÕI LOGIC (CORE) ← GIỮ NGUYÊN TOÀN BỘ
 -- ==========================================
-local Player       = game.Players.LocalPlayer
+local Player = game.Players.LocalPlayer
 local TweenService = game:GetService("TweenService")
-local RunService   = game:GetService("RunService")
-local CoreGui      = game:GetService("CoreGui")
-
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
 local function TweenTo(targetCFrame)
     local character = Player.Character or Player.CharacterAdded:Wait()
     if not character or not character:FindFirstChild("HumanoidRootPart") then return false end
-
-    local hrp      = character:WaitForChild("HumanoidRootPart")
+    local hrp = character:WaitForChild("HumanoidRootPart")
     local humanoid = character:WaitForChild("Humanoid")
-
     local distance = (hrp.Position - targetCFrame.Position).Magnitude
     if distance <= 250 then
         hrp.CFrame = targetCFrame
         return true
     end
-
     local bv = hrp:FindFirstChild("DracoAntiGravity") or Instance.new("BodyVelocity")
-    bv.Name     = "DracoAntiGravity"
+    bv.Name = "DracoAntiGravity"
     bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
     bv.Velocity = Vector3.new(0, 0, 0)
-    bv.Parent   = hrp
-
-    local speed    = 300
-    local time     = distance / speed
+    bv.Parent = hrp
+    local speed = 300
+    local time = distance / speed
     local tweenObj = TweenService:Create(hrp, TweenInfo.new(time, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
-
     local noclip
     noclip = RunService.Stepped:Connect(function()
         if humanoid and humanoid.Parent then
@@ -91,22 +106,18 @@ local function TweenTo(targetCFrame)
             end
         end
     end)
-
     tweenObj:Play()
     tweenObj.Completed:Wait()
-
     if bv and bv.Parent then bv:Destroy() end
     if noclip then noclip:Disconnect() end
-
     if humanoid and humanoid.Parent and humanoid.Health > 0 then
         humanoid:ChangeState(8)
         return true
     end
     return false
 end
-
 -- ==========================================
--- [ PHẦN 1.5 ] CHECK BACKPACK & STATS
+-- [ PHẦN 1.5 ] CHECK BACKPACK & STATS ← GIỮ NGUYÊN
 -- ==========================================
 local function CheckHasWeapon(weaponName)
     local chr = Player.Character
@@ -123,27 +134,25 @@ local function CheckHasWeapon(weaponName)
     end
     return false
 end
-
 local function getStats()
     local s = { Race = "?", Fragments = 0, Points = 0,
                 Melee = 0, Defense = 0, Sword = 0, Gun = 0, Fruit = 0 }
     pcall(function()
-        local D     = Player.Data
-        s.Race      = D.Race.Value
+        local D = Player.Data
+        s.Race = D.Race.Value
         s.Fragments = D.Fragments.Value
-        s.Points    = D.Points.Value
-        local S     = D.Stats
-        s.Melee   = S.Melee.Level.Value
+        s.Points = D.Points.Value
+        local S = D.Stats
+        s.Melee = S.Melee.Level.Value
         s.Defense = S.Defense.Level.Value
-        s.Sword   = S.Sword.Level.Value
-        s.Gun     = S.Gun.Level.Value
-        s.Fruit   = S["Demon Fruit"].Level.Value
+        s.Sword = S.Sword.Level.Value
+        s.Gun = S.Gun.Level.Value
+        s.Fruit = S["Demon Fruit"].Level.Value
     end)
     return s
 end
-
 local function GetWeaponMastery(weaponName)
-    local p    = game.Players.LocalPlayer
+    local p = game.Players.LocalPlayer
     local item = p.Backpack:FindFirstChild(weaponName)
         or (p.Character and p.Character:FindFirstChild(weaponName))
     if item and item:FindFirstChild("Level") then
@@ -151,15 +160,13 @@ local function GetWeaponMastery(weaponName)
     end
     return 0
 end
-
 -- ==========================================
--- [ PHẦN 1.6 ] HÀM GỌI BANANAHUB GỌN
--- Dùng NhapKey từ executor, không hardcode key
+-- [ PHẦN 1.6 ] HÀM GỌI BANANAHUB GỌN ← GIỮ NGUYÊN
 -- ==========================================
 local function LoadBananaHub(config)
     repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
-    getgenv().Key    = NhapKey       -- ← key từ executor
-    getgenv().NewUI  = true
+    getgenv().Key = NhapKey
+    getgenv().NewUI = true
     getgenv().Config = config
     local ok, err = pcall(function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/obiiyeuem/vthangsitink/main/BananaHub.lua"))()
@@ -171,128 +178,113 @@ local function LoadBananaHub(config)
     end
     return ok
 end
-
 -- ==========================================
--- [ PHẦN 2 ] GIAO DIỆN UI (VÀNG - ĐEN)
+-- [ PHẦN 2 ] GIAO DIỆN UI (VÀNG - ĐEN) ← GIỮ NGUYÊN
 -- ==========================================
 if CoreGui:FindFirstChild("DracoAutoUI") then
     CoreGui.DracoAutoUI:Destroy()
 end
-
 local ScreenGui = Instance.new("ScreenGui", CoreGui)
 ScreenGui.Name = "DracoAutoUI"
-
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size             = UDim2.new(0, 450, 0, 265)
-MainFrame.Position         = UDim2.new(0.5, -225, 0.5, -107)
+MainFrame.Size = UDim2.new(0, 450, 0, 265)
+MainFrame.Position = UDim2.new(0.5, -225, 0.5, -107)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-MainFrame.Active           = true
-MainFrame.Draggable        = true
-Instance.new("UIStroke", MainFrame).Color        = Color3.fromRGB(255, 200, 0)
+MainFrame.Active = true
+MainFrame.Draggable = true
+Instance.new("UIStroke", MainFrame).Color = Color3.fromRGB(255, 200, 0)
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
-
 local Title = Instance.new("TextLabel", MainFrame)
-Title.Size               = UDim2.new(1, 0, 0, 35)
-Title.Text               = "Draco Auto"
-Title.TextColor3         = Color3.fromRGB(255, 200, 0)
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.Text = "Draco Auto"
+Title.TextColor3 = Color3.fromRGB(255, 200, 0)
 Title.BackgroundTransparency = 1
-Title.Font               = Enum.Font.GothamBold
-Title.TextSize           = 14
-Title.TextXAlignment     = Enum.TextXAlignment.Center
-
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.TextXAlignment = Enum.TextXAlignment.Center
 local Line = Instance.new("Frame", Title)
-Line.Size             = UDim2.new(1, 0, 0, 1)
-Line.Position         = UDim2.new(0, 0, 1, 0)
+Line.Size = UDim2.new(1, 0, 0, 1)
+Line.Position = UDim2.new(0, 0, 1, 0)
 Line.BackgroundColor3 = Color3.fromRGB(255, 200, 0)
-Line.BorderSizePixel  = 0
-
+Line.BorderSizePixel = 0
 local InfoPanel = Instance.new("Frame", MainFrame)
-InfoPanel.Size               = UDim2.new(1, -20, 1, -50)
-InfoPanel.Position           = UDim2.new(0, 10, 0, 40)
+InfoPanel.Size = UDim2.new(1, -20, 1, -50)
+InfoPanel.Position = UDim2.new(0, 10, 0, 40)
 InfoPanel.BackgroundTransparency = 1
-
 local ActionStatus = Instance.new("TextLabel", InfoPanel)
-ActionStatus.Size               = UDim2.new(1, 0, 0, 22)
-ActionStatus.Position           = UDim2.new(0, 0, 0, 0)
-ActionStatus.Text               = "Hành động: Khởi động kịch bản..."
-ActionStatus.TextColor3         = Color3.fromRGB(200, 200, 200)
-ActionStatus.Font               = Enum.Font.Gotham
+ActionStatus.Size = UDim2.new(1, 0, 0, 22)
+ActionStatus.Position = UDim2.new(0, 0, 0, 0)
+ActionStatus.Text = "Hành động: Khởi động kịch bản..."
+ActionStatus.TextColor3 = Color3.fromRGB(200, 200, 200)
+ActionStatus.Font = Enum.Font.Gotham
 ActionStatus.BackgroundTransparency = 1
-ActionStatus.TextSize           = 12
-ActionStatus.TextXAlignment     = Enum.TextXAlignment.Left
-
+ActionStatus.TextSize = 12
+ActionStatus.TextXAlignment = Enum.TextXAlignment.Left
 local MasteryLabel = Instance.new("TextLabel", InfoPanel)
-MasteryLabel.Size               = UDim2.new(1, 0, 0, 22)
-MasteryLabel.Position           = UDim2.new(0, 0, 0, 25)
-MasteryLabel.Text               = "Mastery: Chờ xác nhận vũ khí..."
-MasteryLabel.TextColor3         = Color3.fromRGB(255, 200, 0)
-MasteryLabel.Font               = Enum.Font.GothamBold
+MasteryLabel.Size = UDim2.new(1, 0, 0, 22)
+MasteryLabel.Position = UDim2.new(0, 0, 0, 25)
+MasteryLabel.Text = "Mastery: Chờ xác nhận vũ khí..."
+MasteryLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
+MasteryLabel.Font = Enum.Font.GothamBold
 MasteryLabel.BackgroundTransparency = 1
-MasteryLabel.TextSize           = 13
-MasteryLabel.TextXAlignment     = Enum.TextXAlignment.Left
-
+MasteryLabel.TextSize = 13
+MasteryLabel.TextXAlignment = Enum.TextXAlignment.Left
 local Div = Instance.new("Frame", InfoPanel)
-Div.Size             = UDim2.new(1, 0, 0, 1)
-Div.Position         = UDim2.new(0, 0, 0, 52)
+Div.Size = UDim2.new(1, 0, 0, 1)
+Div.Position = UDim2.new(0, 0, 0, 52)
 Div.BackgroundColor3 = Color3.fromRGB(80, 60, 0)
-Div.BorderSizePixel  = 0
-
+Div.BorderSizePixel = 0
 local RaceLabel = Instance.new("TextLabel", InfoPanel)
-RaceLabel.Size               = UDim2.new(1, 0, 0, 22)
-RaceLabel.Position           = UDim2.new(0, 0, 0, 58)
-RaceLabel.Text               = "🧬 Race: ..."
-RaceLabel.TextColor3         = Color3.fromRGB(160, 200, 255)
-RaceLabel.Font               = Enum.Font.Gotham
+RaceLabel.Size = UDim2.new(1, 0, 0, 22)
+RaceLabel.Position = UDim2.new(0, 0, 0, 58)
+RaceLabel.Text = "🧬 Race: ..."
+RaceLabel.TextColor3 = Color3.fromRGB(160, 200, 255)
+RaceLabel.Font = Enum.Font.Gotham
 RaceLabel.BackgroundTransparency = 1
-RaceLabel.TextSize           = 12
-RaceLabel.TextXAlignment     = Enum.TextXAlignment.Left
-
+RaceLabel.TextSize = 12
+RaceLabel.TextXAlignment = Enum.TextXAlignment.Left
 local FragLabel = Instance.new("TextLabel", InfoPanel)
-FragLabel.Size               = UDim2.new(1, 0, 0, 22)
-FragLabel.Position           = UDim2.new(0, 0, 0, 82)
-FragLabel.Text               = "🔮 Fragments: ..."
-FragLabel.TextColor3         = Color3.fromRGB(200, 160, 255)
-FragLabel.Font               = Enum.Font.Gotham
+FragLabel.Size = UDim2.new(1, 0, 0, 22)
+FragLabel.Position = UDim2.new(0, 0, 0, 82)
+FragLabel.Text = "🔮 Fragments: ..."
+FragLabel.TextColor3 = Color3.fromRGB(200, 160, 255)
+FragLabel.Font = Enum.Font.Gotham
 FragLabel.BackgroundTransparency = 1
-FragLabel.TextSize           = 12
-FragLabel.TextXAlignment     = Enum.TextXAlignment.Left
-
+FragLabel.TextSize = 12
+FragLabel.TextXAlignment = Enum.TextXAlignment.Left
 local PointsLabel = Instance.new("TextLabel", InfoPanel)
-PointsLabel.Size               = UDim2.new(1, 0, 0, 22)
-PointsLabel.Position           = UDim2.new(0, 0, 0, 106)
-PointsLabel.Text               = "⭐ Điểm stat chưa dùng: ..."
-PointsLabel.TextColor3         = Color3.fromRGB(255, 220, 80)
-PointsLabel.Font               = Enum.Font.GothamSemibold
+PointsLabel.Size = UDim2.new(1, 0, 0, 22)
+PointsLabel.Position = UDim2.new(0, 0, 0, 106)
+PointsLabel.Text = "⭐ Điểm stat chưa dùng: ..."
+PointsLabel.TextColor3 = Color3.fromRGB(255, 220, 80)
+PointsLabel.Font = Enum.Font.GothamSemibold
 PointsLabel.BackgroundTransparency = 1
-PointsLabel.TextSize           = 12
-PointsLabel.TextXAlignment     = Enum.TextXAlignment.Left
-
+PointsLabel.TextSize = 12
+PointsLabel.TextXAlignment = Enum.TextXAlignment.Left
 local StatRowLabel = Instance.new("TextLabel", InfoPanel)
-StatRowLabel.Size               = UDim2.new(1, 0, 0, 22)
-StatRowLabel.Position           = UDim2.new(0, 0, 0, 130)
-StatRowLabel.Text               = "Melee:0 | Def:0 | Sword:0 | Gun:0 | Fruit:0"
-StatRowLabel.TextColor3         = Color3.fromRGB(220, 220, 220)
-StatRowLabel.Font               = Enum.Font.Gotham
+StatRowLabel.Size = UDim2.new(1, 0, 0, 22)
+StatRowLabel.Position = UDim2.new(0, 0, 0, 130)
+StatRowLabel.Text = "Melee:0 | Def:0 | Sword:0 | Gun:0 | Fruit:0"
+StatRowLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+StatRowLabel.Font = Enum.Font.Gotham
 StatRowLabel.BackgroundTransparency = 1
-StatRowLabel.TextSize           = 11
-StatRowLabel.TextXAlignment     = Enum.TextXAlignment.Left
-
+StatRowLabel.TextSize = 11
+StatRowLabel.TextXAlignment = Enum.TextXAlignment.Left
 local WeaponRowLabel = Instance.new("TextLabel", InfoPanel)
-WeaponRowLabel.Size               = UDim2.new(1, 0, 0, 22)
-WeaponRowLabel.Position           = UDim2.new(0, 0, 0, 154)
-WeaponRowLabel.Text               = "Heart: ❌  |  Storm: ❌"
-WeaponRowLabel.TextColor3         = Color3.fromRGB(220, 220, 220)
-WeaponRowLabel.Font               = Enum.Font.Gotham
+WeaponRowLabel.Size = UDim2.new(1, 0, 0, 22)
+WeaponRowLabel.Position = UDim2.new(0, 0, 0, 154)
+WeaponRowLabel.Text = "Heart: ❌ | Storm: ❌"
+WeaponRowLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+WeaponRowLabel.Font = Enum.Font.Gotham
 WeaponRowLabel.BackgroundTransparency = 1
-WeaponRowLabel.TextSize           = 11
-WeaponRowLabel.TextXAlignment     = Enum.TextXAlignment.Left
-
+WeaponRowLabel.TextSize = 11
+WeaponRowLabel.TextXAlignment = Enum.TextXAlignment.Left
 task.spawn(function()
     while ScreenGui.Parent do
         local s = getStats()
-        RaceLabel.Text    = "🧬 Race: " .. s.Race
-        FragLabel.Text    = "🔮 Fragments: " .. tostring(s.Fragments)
-        PointsLabel.Text  = "⭐ Điểm stat chưa dùng: " .. tostring(s.Points)
+        RaceLabel.Text = "🧬 Race: " .. s.Race
+        FragLabel.Text = "🔮 Fragments: " .. tostring(s.Fragments)
+        PointsLabel.Text = "⭐ Điểm stat chưa dùng: " .. tostring(s.Points)
         StatRowLabel.Text = string.format(
             "Melee:%d | Def:%d | Sword:%d | Gun:%d | Fruit:%d",
             s.Melee, s.Defense, s.Sword, s.Gun, s.Fruit
@@ -300,72 +292,60 @@ task.spawn(function()
         local hasHeart = CheckHasWeapon("Dragonheart")
         local hasStorm = CheckHasWeapon("Dragonstorm")
         WeaponRowLabel.Text = string.format(
-            "Heart: %s  |  Storm: %s",
+            "Heart: %s | Storm: %s",
             hasHeart and "✅" or "❌",
             hasStorm and "✅" or "❌"
         )
         task.wait(3)
     end
 end)
-
 -- ==========================================
--- [ PHẦN 3 : AUTOMATIC ]
+-- [ PHẦN 3 : AUTOMATIC ] ← GIỮ NGUYÊN TOÀN BỘ
 -- ==========================================
-
 repeat task.wait(0.5) until ScreenGui and ScreenGui.Parent ~= nil
 repeat task.wait(0.5) until MainFrame and MainFrame.Visible
 task.wait(1)
-
 ActionStatus.Text = "Hành động: UI sẵn sàng, bắt đầu kiểm tra..."
-
 -- ==========================================
--- [ 3.05 ] KIỂM TRA FRAGMENT
+-- [ 3.05 ] KIỂM TRA FRAGMENT ← GIỮ NGUYÊN
 -- ==========================================
-
 local FRAGMENT_MIN = 8000
-
 local function GetFragments()
     local val = 0
     pcall(function() val = Player.Data.Fragments.Value end)
     return val
 end
-
 do
     local frag = GetFragments()
-
     if frag < FRAGMENT_MIN then
         ActionStatus.Text = "Hành động: [3.05] Fragment thiếu (" .. frag .. "/" .. FRAGMENT_MIN .. "), bắt đầu farm Katakuri..."
         warn("[DracoAuto] [3.05] Fragment = " .. frag .. " < " .. FRAGMENT_MIN .. " → Chạy FarmFragment!")
-
         LoadBananaHub({
             ["Select Method Farm"] = "Farm Katakuri",
-            ["Hop Find Katakuri"]  = true,
-            ["Start Farm"]         = true,
+            ["Hop Find Katakuri"] = true,
+            ["Start Farm"] = true,
         })
-
         repeat
             task.wait(3)
             frag = GetFragments()
             ActionStatus.Text = string.format("Hành động: [3.05] Đang farm Fragment (%d/%d)...", frag, FRAGMENT_MIN)
-            FragLabel.Text      = "🔮 Fragments: " .. tostring(frag)
+            FragLabel.Text = "🔮 Fragments: " .. tostring(frag)
             FragLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
         until frag >= FRAGMENT_MIN
         FragLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-        ActionStatus.Text    = "Hành động: [3.05] ✅ Đủ Fragment (" .. frag .. ")! Tiếp tục kịch bản..."
+        ActionStatus.Text = "Hành động: [3.05] ✅ Đủ Fragment (" .. frag .. ")! Tiếp tục kịch bản..."
         warn("[DracoAuto] [3.05] Fragment đủ rồi → tiếp tục 3.1!")
         task.wait(1)
     else
-        ActionStatus.Text    = "Hành động: [3.05] Fragment đủ (" .. frag .. "), bỏ qua farm!"
+        ActionStatus.Text = "Hành động: [3.05] Fragment đủ (" .. frag .. "), bỏ qua farm!"
         FragLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
         warn("[DracoAuto] [3.05] Fragment = " .. frag .. " >= " .. FRAGMENT_MIN .. " → Bỏ qua farm, vào 3.1!")
         task.wait(0.5)
     end
 end
-
 -- ==========================================
--- [ 3.1 ] HELPERS DÙNG CHUNG
+-- [ 3.1 ] HELPERS DÙNG CHUNG ← GIỮ NGUYÊN
 -- ==========================================
-
 local function EquipWeapon(weaponName)
     local chr = Player.Character
     if chr and chr:FindFirstChild(weaponName) then
@@ -382,10 +362,8 @@ local function EquipWeapon(weaponName)
     end
     return ok
 end
-
 local _lastInvCache = nil
 local _invFailCount = 0
-
 local function GetInventory()
     local ok, inv = pcall(function()
         return game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("getInventory")
@@ -401,7 +379,6 @@ local function GetInventory()
     end
     return {}, false
 end
-
 local function HasItem(invData, itemName)
     local chr = Player.Character
     if chr and chr:FindFirstChild(itemName) then return true, 1 end
@@ -414,22 +391,18 @@ local function HasItem(invData, itemName)
     end
     return false, 0
 end
-
 -- ==========================================
--- [ 3.1 ] LUỒNG CHÍNH — CHECK HEART & STORM
+-- [ 3.1 ] LUỒNG CHÍNH — CHECK HEART & STORM ← GIỮ NGUYÊN
 -- ==========================================
-
 do
     local inv, _ = GetInventory()
     local hasHeart, _ = HasItem(inv, "Dragonheart")
     local hasStorm, _ = HasItem(inv, "Dragonstorm")
-
     WeaponRowLabel.Text = string.format(
-        "Heart: %s  |  Storm: %s",
+        "Heart: %s | Storm: %s",
         hasHeart and "✅" or "❌",
         hasStorm and "✅" or "❌"
     )
-
     if hasHeart and hasStorm then
         warn("[DracoAuto] [3.1] Luồng 1: Phát hiện Heart + Storm!")
         ActionStatus.Text = "Hành động: [3.1] Đang equip Dragonheart..."
@@ -445,10 +418,8 @@ do
         warn("[DracoAuto] [3.1] Luồng 2: Chưa có Heart/Storm → farm nguyên liệu!")
         ActionStatus.Text = "Hành động: [3.1] Chưa có Heart & Storm → farm nguyên liệu..."
         task.wait(1)
-
         local SCALE_MIN = 5
         local EMBER_MIN = 55
-
         -- BƯỚC A: FARM DRAGON SCALE
         do
             local invA, _ = GetInventory()
@@ -458,13 +429,11 @@ do
                 task.wait(0.5)
             else
                 ActionStatus.Text = "Hành động: [3.1-A] Dragon Scale thiếu (" .. scaleCount .. "/5) → Farm..."
-
                 LoadBananaHub({
                     ["Select Material"] = "Dragon Scale",
-                    ["Farm Material"]   = true,
-                    ["Start Farm"]      = true,
+                    ["Farm Material"] = true,
+                    ["Start Farm"] = true,
                 })
-
                 local lastScaleCount = scaleCount
                 repeat
                     task.wait(3)
@@ -480,7 +449,6 @@ do
                 until nowScale >= SCALE_MIN
             end
         end
-
         -- BƯỚC B: FARM BLAZE EMBER
         do
             local invB, _ = GetInventory()
@@ -490,11 +458,9 @@ do
                 task.wait(0.5)
             else
                 ActionStatus.Text = "Hành động: [3.1-B] Blaze Ember thiếu (" .. emberCount .. "/55) → Farm..."
-
                 LoadBananaHub({
                     ["Auto Quest Dragon Hunter"] = true,
                 })
-
                 local lastEmberCount = emberCount
                 repeat
                     task.wait(3)
@@ -510,36 +476,29 @@ do
                 until nowEmber >= EMBER_MIN
             end
         end
-
         ActionStatus.Text = "Hành động: [3.1] ✅ Đủ nguyên liệu! Sang 3.2 (Craft)..."
         task.wait(1)
     end
 end
-
 -- ==========================================
--- [ 3.2 ] AUTO CRAFT DRAGONHEART & DRAGONSTORM
+-- [ 3.2 ] AUTO CRAFT DRAGONHEART & DRAGONSTORM ← GIỮ NGUYÊN
 -- ==========================================
-
 do
     local invC, _ = GetInventory()
     local hasHeartNow, _ = HasItem(invC, "Dragonheart")
     local hasStormNow, _ = HasItem(invC, "Dragonstorm")
-
-    WeaponRowLabel.Text = string.format("Heart: %s  |  Storm: %s",
+    WeaponRowLabel.Text = string.format("Heart: %s | Storm: %s",
         hasHeartNow and "✅" or "❌", hasStormNow and "✅" or "❌")
-
     if hasHeartNow and hasStormNow then
         ActionStatus.Text = "Hành động: [3.2] Đã có Heart + Storm, bỏ qua craft!"
         task.wait(1)
     else
         ActionStatus.Text = "Hành động: [3.2] Bắt đầu craft..."
         task.wait(0.5)
-
         local RFCraft
         local rfOk = pcall(function()
             RFCraft = game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Net"):WaitForChild("RF/Craft")
         end)
-
         if not rfOk or not RFCraft then
             ActionStatus.Text = "Hành động: [3.2] ❌ Không tìm được RF/Craft!"
         else
@@ -549,7 +508,6 @@ do
                         :InvokeServer("requestEntrance", Vector3.new(5661.5322265625, 1013.0907592773438, -334.9649963378906))
                 end)
             end
-
             local function CraftItem(itemName)
                 local args = {
                     [1] = "Craft",
@@ -560,18 +518,16 @@ do
                 local ok, res = pcall(function()
                     return RFCraft:InvokeServer(unpack(args))
                 end)
-                if not ok then 
-                    warn("[RF/Craft] Failed (" .. itemName .. "):", res) 
-                else 
-                    warn("[RF/Craft] Sent successfully (" .. itemName .. "):", res) 
+                if not ok then
+                    warn("[RF/Craft] Failed (" .. itemName .. "):", res)
+                else
+                    warn("[RF/Craft] Sent successfully (" .. itemName .. "):", res)
                 end
                 return ok
             end
-
             local Craft_CFrame = CFrame.new(5864.833008, 1209.483032, 811.329224)
             ActionStatus.Text = "Hành động: [3.2] Đang bay đến NPC Craft..."
             local arrived = TweenTo(Craft_CFrame)
-
             if arrived then
                 task.wait(0.3)
                 RequestEntrance()
@@ -586,13 +542,11 @@ do
                     CraftItem("Dragonstorm")
                     task.wait(3)
                 end
-
                 local invAfter, _ = GetInventory()
                 local heartAfter, _ = HasItem(invAfter, "Dragonheart")
                 local stormAfter, _ = HasItem(invAfter, "Dragonstorm")
-                WeaponRowLabel.Text = string.format("Heart: %s  |  Storm: %s",
+                WeaponRowLabel.Text = string.format("Heart: %s | Storm: %s",
                     heartAfter and "✅" or "❌", stormAfter and "✅" or "❌")
-
                 if heartAfter and stormAfter then
                     ActionStatus.Text = "Hành động: [3.2] ✅ Craft xong! Kick..."
                     task.wait(2)
@@ -606,18 +560,16 @@ do
         end
     end
 end
-
 -- ==========================================
--- [ 3.3 ] CHECK RACE DRACO & AUTO ĐỔI RACE
+-- [ 3.3 ] CHECK RACE DRACO & AUTO ĐỔI RACE ← GIỮ NGUYÊN
 -- ==========================================
-
 do
     local function GetDragonRace()
         local raceStr = "Unknown"
         pcall(function()
             local CommF = game:GetService("ReplicatedStorage").Remotes.CommF_
-            local v113  = CommF:InvokeServer("Wenlocktoad", "1")
-            local v111  = CommF:InvokeServer("Alchemist", "1")
+            local v113 = CommF:InvokeServer("Wenlocktoad", "1")
+            local v111 = CommF:InvokeServer("Alchemist", "1")
             local raceName = Player.Data.Race.Value
             if Player.Character and Player.Character:FindFirstChild("RaceTransformed") then
                 raceStr = raceName .. "-V4"
@@ -631,12 +583,10 @@ do
         end)
         return raceStr
     end
-
     local function IsDracoDetected()
         local race = GetDragonRace()
         return string.find(race, "Draco") ~= nil or string.find(race, "Dragon") ~= nil
     end
-
     local function DoChangeRace()
         local success = false
         local ok, err = pcall(function()
@@ -653,11 +603,9 @@ do
             return false
         end
     end
-
     local currentRace = GetDragonRace()
-    local isDraco     = IsDracoDetected()
-    RaceLabel.Text    = "🧬 Race: " .. currentRace
-
+    local isDraco = IsDracoDetected()
+    RaceLabel.Text = "🧬 Race: " .. currentRace
     if isDraco then
         ActionStatus.Text = "Hành động: [3.3] ✅ Đã là race " .. currentRace .. ", bỏ qua!"
         task.wait(1)
@@ -688,16 +636,13 @@ do
         end
     end
 end
-
 -- ==========================================
--- [ 3.4 ] FARM MASTERY DRAGONHEART & DRAGONSTORM
+-- [ 3.4 ] FARM MASTERY DRAGONHEART & DRAGONSTORM ← GIỮ NGUYÊN
 -- ==========================================
-
 do
-    local STAT_MAX    = 2800
+    local STAT_MAX = 2800
     local MASTERY_MAX = 500
-    local CommF       = game:GetService("ReplicatedStorage").Remotes.CommF_
-
+    local CommF = game:GetService("ReplicatedStorage").Remotes.CommF_
     local function ResetStat()
         ActionStatus.Text = "Hành động: [3.4] Đang reset stat..."
         warn("[DracoAuto] [3.4] ResetStat: Bắt đầu refund...")
@@ -707,14 +652,12 @@ do
         task.wait(0.5)
         warn("[DracoAuto] [3.4] ResetStat: Hoàn tất!")
     end
-
     local function AddStatPoint(statName, amount)
         pcall(function()
             CommF:InvokeServer("AddPoint", statName, amount)
         end)
         warn("[DracoAuto] [3.4] AddStatPoint: " .. statName .. " +" .. amount)
     end
-
     local function IsStatCorrect(buildType)
         local s = getStats()
         if buildType == "Sword" then
@@ -724,26 +667,21 @@ do
         end
         return false
     end
-
     ActionStatus.Text = "Hành động: [3.4] Đang equip Dragonheart & Dragonstorm..."
     EquipWeapon("Dragonheart")
     task.wait(0.5)
     EquipWeapon("Dragonstorm")
     task.wait(0.5)
-
     local heartMastery = GetWeaponMastery("Dragonheart")
     local stormMastery = GetWeaponMastery("Dragonstorm")
-
     MasteryLabel.Text = string.format("Mastery: Heart %d/500 | Storm %d/500", heartMastery, stormMastery)
     warn("[DracoAuto] [3.4] HeartMastery=" .. heartMastery .. " StormMastery=" .. stormMastery)
-
     -- ==========================================
     -- LUỒNG 1: DRAGONHEART (SWORD) MASTERY < 500
     -- ==========================================
     if heartMastery < MASTERY_MAX then
         warn("[DracoAuto] [3.4-L1] Heart mastery " .. heartMastery .. " < 500 → Farm Sword mastery!")
         ActionStatus.Text = "Hành động: [3.4-L1] Heart mastery " .. heartMastery .. "/500 → Kiểm tra stat Sword build..."
-
         if IsStatCorrect("Sword") then
             ActionStatus.Text = "Hành động: [3.4-L1] ✅ Stat đã đúng Sword build, giữ nguyên!"
             warn("[DracoAuto] [3.4-L1] Stat đã đúng Melee/Defense/Sword → giữ nguyên!")
@@ -754,80 +692,63 @@ do
                 ActionStatus.Text = "Hành động: [3.4-L1] Stat chưa đúng! Reset sau " .. i .. "s..."
                 task.wait(1)
             end
-
             ResetStat()
             task.wait(0.5)
-
             ActionStatus.Text = "Hành động: [3.4-L1] Nâng Melee → " .. STAT_MAX .. "..."
             AddStatPoint("Melee", STAT_MAX)
             task.wait(0.3)
-
             ActionStatus.Text = "Hành động: [3.4-L1] Nâng Defense → " .. STAT_MAX .. "..."
             AddStatPoint("Defense", STAT_MAX)
             task.wait(0.3)
-
             ActionStatus.Text = "Hành động: [3.4-L1] Nâng Sword → " .. STAT_MAX .. "..."
             AddStatPoint("Sword", STAT_MAX)
             task.wait(0.3)
-
             ActionStatus.Text = "Hành động: [3.4-L1] ✅ Hoàn tất Sword build!"
             warn("[DracoAuto] [3.4-L1] Xong reset + nâng Melee/Defense/Sword = " .. STAT_MAX)
         end
-
         ActionStatus.Text = "Hành động: [3.4-L1] Load farm Sword mastery sau 4s..."
         task.wait(4)
-
         warn("[DracoAuto] [3.4-L1] Load BananaHub HeartMastery...")
         ActionStatus.Text = "Hành động: [3.4-L1] Đang load BananaHub farm Heart (Sword) mastery..."
-
         LoadBananaHub({
-            ["Select Weapon"]      = "Sword",
+            ["Select Weapon"] = "Sword",
             ["Select Method Farm"] = "Farm Bones",
-            ["Start Farm"]         = true,
+            ["Start Farm"] = true,
         })
-
         repeat
             task.wait(10)
             heartMastery = GetWeaponMastery("Dragonheart")
             MasteryLabel.Text = string.format("Mastery: Heart %d/500 | Storm %d/500", heartMastery, stormMastery)
             MasteryLabel.TextColor3 = heartMastery >= MASTERY_MAX
                 and Color3.fromRGB(0, 255, 0)
-                or  Color3.fromRGB(255, 200, 0)
+                or Color3.fromRGB(255, 200, 0)
             ActionStatus.Text = string.format("Hành động: [3.4-L1] Đang farm Heart mastery (%d/500)...", heartMastery)
             warn("[DracoAuto] [3.4-L1] Heart mastery: " .. heartMastery)
         until heartMastery >= MASTERY_MAX
-
         ActionStatus.Text = "Hành động: [3.4-L1] ✅ Heart mastery đạt " .. heartMastery .. "/500! Kick..."
         warn("[DracoAuto] [3.4-L1] Heart mastery đủ 500 → Kick!")
         task.wait(2)
         Player:Kick("\n[ Draco Auto ]\nDragonheart đạt " .. heartMastery .. "/500 Mastery!\nRejoin để farm Dragonstorm mastery.")
-
     -- ==========================================
     -- LUỒNG 2: HEART >= 500 → FARM DRAGONSTORM (GUN) MASTERY
     -- ==========================================
     else
         warn("[DracoAuto] [3.4-L2] Heart mastery " .. heartMastery .. " >= 500 → Check Storm!")
-
         stormMastery = GetWeaponMastery("Dragonstorm")
         MasteryLabel.Text = string.format("Mastery: Heart %d/500 | Storm %d/500", heartMastery, stormMastery)
-
         if stormMastery >= MASTERY_MAX then
             ActionStatus.Text = "Hành động: [3.4-L2] ✅ Cả Heart + Storm đều đủ 500!"
             warn("[DracoAuto] [3.4-L2] Cả hai đã đủ mastery → Ghi file + kick!")
-
             pcall(function() writefile(Player.Name .. ".txt", "Completed-mastery") end)
             warn("[DracoAuto] [3.4-L2] Đã ghi file " .. Player.Name .. ".txt → Completed-mastery")
-
             for i = 10, 1, -1 do
                 ActionStatus.Text = "Hành động: [3.4-L2] ✅ HOÀN THÀNH! Kick sau " .. i .. "s..."
                 task.wait(1)
             end
             Player:Kick("\n[ Draco Auto ]\n✅ HOÀN THÀNH!\nHeart: " .. heartMastery .. "/500 | Storm: " .. stormMastery .. "/500\nFile " .. Player.Name .. ".txt đã ghi.")
-
         else
             warn("[DracoAuto] [3.4-L2] Storm mastery " .. stormMastery .. " < 500 → Farm Gun mastery!")
             ActionStatus.Text = "Hành động: [3.4-L2] Storm mastery " .. stormMastery .. "/500 → Kiểm tra stat Gun build..."
-
             if IsStatCorrect("Gun") then
                 ActionStatus.Text = "Hành động: [3.4-L2] ✅ Stat đã đúng Gun build, giữ nguyên!"
                 warn("[DracoAuto] [3.4-L2] Stat đã đúng Melee/Defense/Gun → giữ nguyên!")
@@ -838,58 +759,46 @@ do
                     ActionStatus.Text = "Hành động: [3.4-L2] Stat chưa đúng! Reset sau " .. i .. "s..."
                     task.wait(1)
                 end
-
                 ResetStat()
                 task.wait(0.5)
-
                 ActionStatus.Text = "Hành động: [3.4-L2] Nâng Melee → " .. STAT_MAX .. "..."
                 AddStatPoint("Melee", STAT_MAX)
                 task.wait(0.3)
-
                 ActionStatus.Text = "Hành động: [3.4-L2] Nâng Defense → " .. STAT_MAX .. "..."
                 AddStatPoint("Defense", STAT_MAX)
                 task.wait(0.3)
-
                 ActionStatus.Text = "Hành động: [3.4-L2] Nâng Gun → " .. STAT_MAX .. "..."
                 AddStatPoint("Gun", STAT_MAX)
                 task.wait(0.3)
-
                 ActionStatus.Text = "Hành động: [3.4-L2] ✅ Hoàn tất Gun build!"
                 warn("[DracoAuto] [3.4-L2] Xong reset + nâng Melee/Defense/Gun = " .. STAT_MAX)
             end
-
             ActionStatus.Text = "Hành động: [3.4-L2] Load farm Storm (Gun) mastery sau 4s..."
             task.wait(4)
-
             warn("[DracoAuto] [3.4-L2] Load BananaHub StormMastery...")
             ActionStatus.Text = "Hành động: [3.4-L2] Đang load BananaHub farm Storm (Gun) mastery..."
-
             LoadBananaHub({
-                ["Select Weapon"]              = "Melee",
-                ["Select Method Farm"]         = "Farm Bones",
+                ["Select Weapon"] = "Melee",
+                ["Select Method Farm"] = "Farm Bones",
                 ["Select Method Farm Mastery"] = "Gun",
-                ["Health %"]                   = "45",
-                ["Farm Mastery"]               = true,
-                ["Start Farm"]                 = true,
+                ["Health %"] = "45",
+                ["Farm Mastery"] = true,
+                ["Start Farm"] = true,
             })
-
             repeat
                 task.wait(10)
                 stormMastery = GetWeaponMastery("Dragonstorm")
                 MasteryLabel.Text = string.format("Mastery: Heart %d/500 | Storm %d/500", heartMastery, stormMastery)
                 MasteryLabel.TextColor3 = stormMastery >= MASTERY_MAX
                     and Color3.fromRGB(0, 255, 0)
-                    or  Color3.fromRGB(255, 200, 0)
+                    or Color3.fromRGB(255, 200, 0)
                 ActionStatus.Text = string.format("Hành động: [3.4-L2] Đang farm Storm mastery (%d/500)...", stormMastery)
                 warn("[DracoAuto] [3.4-L2] Storm mastery: " .. stormMastery)
             until stormMastery >= MASTERY_MAX
-
             ActionStatus.Text = "Hành động: [3.4-L2] ✅ Storm mastery đạt " .. stormMastery .. "/500! Ghi file..."
             warn("[DracoAuto] [3.4-L2] Storm mastery đủ 500 → Ghi file!")
-
             pcall(function() writefile(Player.Name .. ".txt", "Completed-mastery") end)
             warn("[DracoAuto] [3.4-L2] Đã ghi file " .. Player.Name .. ".txt → Completed-mastery")
-
             ActionStatus.Text = "Hành động: [3.4-L2] ✅ Đã ghi file! Kick sau 10s..."
             for i = 10, 1, -1 do
                 ActionStatus.Text = "Hành động: [3.4-L2] ✅ HOÀN THÀNH! Kick sau " .. i .. "s..."
