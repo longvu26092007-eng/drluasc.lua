@@ -1,91 +1,88 @@
 --[[
     ╔══════════════════════════════════════════════════════════════════╗
-    ║ PREHISTORIC ISLAND DETECTOR + AUTO HOP ║
-    ║ ║
-    ║ Chức năng: ║
-    ║ • Detect đảo Prehistoric Island (2 cách Banana) ║
-    ║ • Detect trạng thái trial (chưa kích / đang kích / xong) ║
-    ║ • Đếm số player khác trên đảo ║
-    ║ • Sau khi trial xong → nếu có người khác → hop __ServerBrowser║
-    ║ • [A] Detect Locate Player — tự shutdown nếu bị stuck ║
+    ║       PREHISTORIC ISLAND DETECTOR + AUTO HOP                    ║
+    ║                                                                  ║
+    ║  Chức năng:                                                      ║
+    ║  • Detect đảo Prehistoric Island (2 cách Banana)                ║
+    ║  • Detect trạng thái trial (chưa kích / đang kích / xong)      ║
+    ║  • Đếm số player khác trên đảo                                  ║
+    ║  • Sau khi trial xong → nếu có người khác → hop __ServerBrowser║
+    ║  • [A] Detect Locate Player — tự shutdown nếu bị stuck          ║
     ╚══════════════════════════════════════════════════════════════════╝
 --]]
+
 -- ══ 1. ĐỢI GAME LOAD ══
 repeat task.wait() until game:IsLoaded()
 repeat task.wait() until game.Players.LocalPlayer
 repeat task.wait() until game.Players.LocalPlayer:FindFirstChild("PlayerGui")
 
--- ══ 2. JOIN TEAM (ĐÃ SỬA - Remote ưu tiên + fallback UI) ══
+-- ══ 2. JOIN TEAM ══
 do
-    local player = game.Players.LocalPlayer
+    local _plr = game.Players.LocalPlayer
     local _team = getgenv().Team or "Pirates"
-    
-    if player.Team == nil then
-        warn("[PreDetect] Đang join team:", _team)
-        
-        -- Ưu tiên dùng Remote (ổn định nhất)
-        local success = pcall(function()
-            game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("SetTeam", _team)
+
+    if _plr.Team == nil then
+        -- Cách 1: Gọi remote trực tiếp (nhanh, ổn định)
+        local ok = pcall(function()
+            game.ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", _team)
         end)
-        
-        if success then
-            warn("[PreDetect] ✅ Join team thành công bằng Remote")
-            task.wait(1.5)
-        else
-            -- Fallback click UI (như cũ)
-            warn("[PreDetect] Remote thất bại, thử click UI...")
+
+        -- Cách 2: Fallback nếu remote không hoạt động → click UI
+        if not ok or _plr.Team == nil then
             local _vim = game:GetService("VirtualInputManager")
             repeat task.wait()
-                for _, v in pairs(player.PlayerGui:GetChildren()) do
+                for _, v in pairs(_plr.PlayerGui:GetChildren()) do
                     if string.find(v.Name, "Main") then
                         pcall(function()
                             local btn = v.ChooseTeam.Container[_team].Frame.TextButton
-                            btn.Size = UDim2.new(0,10000,0,10000)
-                            btn.Position = UDim2.new(-4,0,-5,0)
+                            btn.Size = UDim2.new(0, 10000, 0, 10000)
+                            btn.Position = UDim2.new(-4, 0, -5, 0)
                             btn.BackgroundTransparency = 1
                             task.wait(0.5)
-                            _vim:SendMouseButtonEvent(0,0,0,true,game,1)
-                            task.wait(0.05)
-                            _vim:SendMouseButtonEvent(0,0,0,false,game,1)
-                            task.wait(0.05)
+                            _vim:SendMouseButtonEvent(0, 0, 0, true, game, 1); task.wait(0.05)
+                            _vim:SendMouseButtonEvent(0, 0, 0, false, game, 1); task.wait(0.05)
                         end)
                     end
                 end
-            until player.Team ~= nil
-            task.wait(2)
+            until _plr.Team ~= nil and game:IsLoaded()
         end
-    else
-        warn("[PreDetect] ✅ Đã có team:", player.Team.Name)
+
+        task.wait(2)
     end
 end
 
 -- ══ 3. ĐỢI CHARACTER ══
 repeat task.wait() until game.Players.LocalPlayer.Character
     and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
 getgenv().PreDetect = {
     Running = true,
-    HopMaxPlayers = 5, -- Max player server khi hop
-    HopWaitTime = 8, -- Chờ trước khi hop
-    IslandRange = 800, -- Phạm vi detect player trên đảo (studs)
-    CheckInterval = 2, -- Giây giữa mỗi lần check
+    HopMaxPlayers = 5,       -- Max player server khi hop
+    HopWaitTime = 8,         -- Chờ trước khi hop
+    IslandRange = 800,       -- Phạm vi detect player trên đảo (studs)
+    CheckInterval = 2,       -- Giây giữa mỗi lần check
     HopIfOthersOnIsland = true, -- Tự hop nếu có người khác sau trial xong
+
     -- [A] Detect Locate Player — Anti-Stuck
-    StuckThreshold_NoIsland = 120, -- 2 phút (không có đảo Pre)
-    StuckThreshold_HasIsland = 300, -- 5 phút (có đảo Pre)
-    StuckMoveDistance = 15, -- Phải di chuyển ít nhất 15 studs mới tính là "đã di chuyển"
-    StuckCheckInterval = 5, -- Check vị trí mỗi 5 giây
+    StuckThreshold_NoIsland = 120,   -- 2 phút (không có đảo Pre)
+    StuckThreshold_HasIsland = 300,  -- 5 phút (có đảo Pre)
+    StuckMoveDistance = 15,          -- Phải di chuyển ít nhất 15 studs mới tính là "đã di chuyển"
+    StuckCheckInterval = 5,          -- Check vị trí mỗi 5 giây
 }
+
 -- ==========================================
 -- SERVICES
 -- ==========================================
-local Players = game:GetService("Players")
+local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local TeleportService = game:GetService("TeleportService")
-local GuiService = game:GetService("GuiService")
+local RunService        = game:GetService("RunService")
+local TeleportService   = game:GetService("TeleportService")
+local GuiService        = game:GetService("GuiService")
+
 local PlaceId, JobId = game.PlaceId, game.JobId
 local LocalPlayer = Players.LocalPlayer
 local Character, Humanoid, HumanoidRootPart
+
 local function RefreshCharacter(char)
     Character = char
     Humanoid = char:WaitForChild("Humanoid")
@@ -93,6 +90,7 @@ local function RefreshCharacter(char)
 end
 LocalPlayer.CharacterAdded:Connect(RefreshCharacter)
 if LocalPlayer.Character then RefreshCharacter(LocalPlayer.Character) end
+
 -- ==========================================
 -- UI
 -- ==========================================
@@ -103,11 +101,13 @@ end)
 local UIParent = (gethui and gethui()) or game:GetService("CoreGui")
 local SG = Instance.new("ScreenGui"); SG.Name = "PreDetectUI"; SG.ResetOnSpawn = false
 SG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; SG.Parent = UIParent
+
 local MF = Instance.new("Frame"); MF.Name = "Main"; MF.Size = UDim2.new(0, 300, 0, 370)
 MF.Position = UDim2.new(1, -320, 0, 20); MF.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
 MF.BorderSizePixel = 0; MF.Parent = SG; MF.Active = true; MF.Draggable = true
 Instance.new("UICorner", MF).CornerRadius = UDim.new(0, 10)
 local stk = Instance.new("UIStroke", MF); stk.Color = Color3.fromRGB(255, 120, 0); stk.Thickness = 2
+
 local TB = Instance.new("Frame", MF); TB.Size = UDim2.new(1, 0, 0, 32)
 TB.BackgroundColor3 = Color3.fromRGB(255, 120, 0); TB.BorderSizePixel = 0
 Instance.new("UICorner", TB).CornerRadius = UDim.new(0, 10)
@@ -117,11 +117,13 @@ local TL = Instance.new("TextLabel", TB); TL.Size = UDim2.new(1, -40, 1, 0); TL.
 TL.BackgroundTransparency = 1; TL.Text = "🌋 PRE ISLAND DETECTOR"
 TL.TextColor3 = Color3.new(1, 1, 1); TL.TextSize = 14; TL.Font = Enum.Font.GothamBold
 TL.TextXAlignment = Enum.TextXAlignment.Left
+
 local MinBtn = Instance.new("TextButton", TB); MinBtn.Size = UDim2.new(0, 26, 0, 26)
 MinBtn.Position = UDim2.new(1, -30, 0, 3); MinBtn.BackgroundColor3 = Color3.fromRGB(200, 80, 0)
 MinBtn.Text = "−"; MinBtn.TextColor3 = Color3.new(1, 1, 1); MinBtn.TextSize = 16
 MinBtn.Font = Enum.Font.GothamBold; MinBtn.BorderSizePixel = 0
 Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 6)
+
 local CF = Instance.new("Frame", MF); CF.Name = "Content"; CF.Size = UDim2.new(1, -12, 1, -40)
 CF.Position = UDim2.new(0, 6, 0, 36); CF.BackgroundTransparency = 1
 local _min = false
@@ -130,6 +132,7 @@ MinBtn.MouseButton1Click:Connect(function()
     MF.Size = _min and UDim2.new(0, 300, 0, 32) or UDim2.new(0, 300, 0, 370)
     MinBtn.Text = _min and "+" or "−"
 end)
+
 local _labels = {}; local _lY = 0
 local function ML(n, t)
     local l = Instance.new("TextLabel", CF); l.Name = n; l.Size = UDim2.new(1, 0, 0, 20)
@@ -143,21 +146,23 @@ local function MS()
 end
 local function UL(n, t) if _labels[n] then _labels[n].Text = t end end
 local function SLC(n, c) if _labels[n] then _labels[n].TextColor3 = c end end
+
 ML("header", "═══ ĐẢO PRE ═══"); SLC("header", Color3.fromRGB(255, 120, 0)); MS()
-ML("island", "🌋 Đảo: ...")
-ML("trial", "⚡ Trial: ...")
-ML("golem", "👹 Golem: ...")
-ML("bones", "🦴 Bones: ...")
-ML("eggs", "🥚 Eggs: ...")
+ML("island",   "🌋 Đảo: ...")
+ML("trial",    "⚡ Trial: ...")
+ML("golem",    "👹 Golem: ...")
+ML("bones",    "🦴 Bones: ...")
+ML("eggs",     "🥚 Eggs: ...")
 MS()
 ML("header2", "═══ PLAYERS ═══"); SLC("header2", Color3.fromRGB(255, 120, 0)); MS()
-ML("players", "👥 Người trên đảo: ...")
-ML("names", "📋 Tên: ...")
-ML("action", "🎯 Hành động: Đang chờ...")
-ML("server", "🖥️ Server: " .. string.sub(JobId, 1, 20) .. "...")
+ML("players",  "👥 Người trên đảo: ...")
+ML("names",    "📋 Tên: ...")
+ML("action",   "🎯 Hành động: Đang chờ...")
+ML("server",   "🖥️ Server: " .. string.sub(JobId, 1, 20) .. "...")
 MS()
 ML("header3", "═══ ANTI-STUCK ═══"); SLC("header3", Color3.fromRGB(255, 120, 0)); MS()
-ML("stuck", "📍 Stuck: Đang khởi tạo...")
+ML("stuck",    "📍 Stuck: Đang khởi tạo...")
+
 -- ==========================================
 -- CHỜ GAME LOAD
 -- ==========================================
@@ -167,21 +172,25 @@ if not game:IsLoaded() or workspace.DistributedGameTime <= 10 then
 end
 repeat task.wait(2) until Character and Character:FindFirstChild("HumanoidRootPart")
 UL("action", "🎯 Game đã load!")
+
 -- ==========================================
 -- DETECT FUNCTIONS (Banana file 2 style)
 -- ==========================================
+
 local function IsIslandSpawned()
     local ok, r = pcall(function()
         return workspace._WorldOrigin.Locations:FindFirstChild("Prehistoric Island") ~= nil
     end)
     return ok and r
 end
+
 local function IsIslandLoaded()
     local ok, r = pcall(function()
         return workspace.Map:FindFirstChild("PrehistoricIsland") ~= nil
     end)
     return ok and r
 end
+
 local function GetIslandPosition()
     local ok, pos = pcall(function()
         local loc = workspace._WorldOrigin.Locations:FindFirstChild("Prehistoric Island")
@@ -194,6 +203,7 @@ local function GetIslandPosition()
     end)
     return ok and pos or nil
 end
+
 local function GetTrialState()
     if not IsIslandLoaded() then return "no_island" end
     local ok, state = pcall(function()
@@ -235,6 +245,7 @@ local function GetTrialState()
     end)
     return ok and state or "error"
 end
+
 local function GetPlayersOnIsland()
     local islandPos = GetIslandPosition()
     if not islandPos then return {}, 0 end
@@ -253,6 +264,7 @@ local function GetPlayersOnIsland()
     end
     return playersOnIsland, #playersOnIsland
 end
+
 local function CountBones()
     local count = 0
     for _, v in pairs(workspace:GetChildren()) do
@@ -260,6 +272,7 @@ local function CountBones()
     end
     return count
 end
+
 local function CountEggs()
     local ok, count = pcall(function()
         local island = workspace.Map:FindFirstChild("PrehistoricIsland")
@@ -270,6 +283,7 @@ local function CountEggs()
     end)
     return ok and count or 0
 end
+
 local function IsGolemAlive()
     for _, e in pairs(workspace.Enemies:GetChildren()) do
         if e.Name == "Lava Golem" and e:FindFirstChild("Humanoid") and e.Humanoid.Health > 0 then
@@ -278,6 +292,7 @@ local function IsGolemAlive()
     end
     return false, 0, 0
 end
+
 -- ==========================================
 -- HOP SERVER (__ServerBrowser KaitunBoss)
 -- ==========================================
@@ -295,6 +310,7 @@ local function GetServers()
     end
     return nil
 end
+
 local function HopServer(reason)
     UL("action", "🔄 Hop: " .. tostring(reason))
     local Servers = GetServers()
@@ -317,6 +333,7 @@ local function HopServer(reason)
     UL("action", "❌ Không tìm server phù hợp")
     return false
 end
+
 -- ==========================================
 -- ANTI-AFK + ANTI-DISCONNECT
 -- ==========================================
@@ -326,6 +343,7 @@ LocalPlayer.Idled:Connect(function()
     task.wait()
     VU:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
 end)
+
 TeleportService.TeleportInitFailed:Connect(function(_, teleportResult, message)
     if teleportResult == Enum.TeleportResult.IsTeleporting and message:find("previous teleport") then
         task.delay(10, function() game:Shutdown() end)
@@ -336,28 +354,32 @@ GuiService.ErrorMessageChanged:Connect(newcclosure(function()
         while true do TeleportService:TeleportToPlaceInstance(PlaceId, JobId, LocalPlayer) task.wait(5) end
     end
 end))
+
 -- ==========================================
 -- TRIAL STATE → TIẾNG VIỆT
 -- ==========================================
 local STATE_TEXT = {
-    no_island = "❌ Không có đảo",
-    no_core = "⚠️ Đảo có nhưng chưa load Core",
-    not_activated = "🔴 Chưa kích hoạt (cần nhấn E)",
-    fighting_golem = "⚔️ Đang đánh Golem",
-    fixing_volcano = "🔧 Đang sửa núi lửa (đập đá)",
-    completed_loot = "✅ XONG! Có Eggs/Bones",
-    completed_empty = "✅ XONG! (hết loot)",
-    error = "⚠️ Lỗi detect",
+    no_island        = "❌ Không có đảo",
+    no_core          = "⚠️ Đảo có nhưng chưa load Core",
+    not_activated     = "🔴 Chưa kích hoạt (cần nhấn E)",
+    fighting_golem   = "⚔️ Đang đánh Golem",
+    fixing_volcano   = "🔧 Đang sửa núi lửa (đập đá)",
+    completed_loot   = "✅ XONG! Có Eggs/Bones",
+    completed_empty  = "✅ XONG! (hết loot)",
+    error            = "⚠️ Lỗi detect",
 }
+
 -- ==========================================
 -- MAIN DETECT LOOP
 -- ==========================================
 task.spawn(function()
     task.wait(3)
+
     while getgenv().PreDetect.Running do
         xpcall(function()
             local spawned = IsIslandSpawned()
             local loaded = IsIslandLoaded()
+
             if spawned or loaded then
                 UL("island", "🌋 Đảo: ✅ CÓ" .. (loaded and " (loaded)" or " (spawned)"))
                 SLC("island", Color3.fromRGB(80, 255, 80))
@@ -374,8 +396,10 @@ task.spawn(function()
                 task.wait(getgenv().PreDetect.CheckInterval)
                 return
             end
+
             local state = GetTrialState()
             UL("trial", "⚡ Trial: " .. (STATE_TEXT[state] or state))
+
             local golemAlive, golemHP, golemMax = IsGolemAlive()
             if golemAlive then
                 local pct = golemMax > 0 and math.floor(golemHP / golemMax * 100) or 0
@@ -385,14 +409,17 @@ task.spawn(function()
                 UL("golem", "👹 Golem: Không có")
                 SLC("golem", Color3.fromRGB(220, 220, 240))
             end
+
             local boneCount = CountBones()
             local eggCount = CountEggs()
             UL("bones", "🦴 Bones: " .. boneCount)
             UL("eggs", "🥚 Eggs: " .. eggCount)
             if boneCount > 0 then SLC("bones", Color3.fromRGB(80, 255, 80)) else SLC("bones", Color3.fromRGB(220, 220, 240)) end
             if eggCount > 0 then SLC("eggs", Color3.fromRGB(80, 255, 80)) else SLC("eggs", Color3.fromRGB(220, 220, 240)) end
+
             local playerNames, playerCount = GetPlayersOnIsland()
             UL("players", "👥 Người trên đảo: " .. playerCount .. " (ngoài mình)")
+
             if playerCount > 0 then
                 local nameStr = table.concat(playerNames, ", ")
                 if #nameStr > 40 then nameStr = string.sub(nameStr, 1, 37) .. "..." end
@@ -404,6 +431,7 @@ task.spawn(function()
                 SLC("players", Color3.fromRGB(80, 255, 80))
                 SLC("names", Color3.fromRGB(220, 220, 240))
             end
+
             if state == "completed_loot" or state == "completed_empty" then
                 if playerCount > 0 and getgenv().PreDetect.HopIfOthersOnIsland then
                     UL("action", "🔄 Trial xong + " .. playerCount .. " người khác → HOP!")
@@ -431,63 +459,114 @@ task.spawn(function()
                 UL("action", "🎯 Đang theo dõi...")
                 SLC("action", Color3.fromRGB(220, 220, 240))
             end
+
         end, function(err)
             warn("[PreDetect] ERROR:", err)
             UL("action", "⚠️ Lỗi: " .. string.sub(tostring(err), 1, 40))
         end)
+
         task.wait(getgenv().PreDetect.CheckInterval)
     end
+
     UL("action", "⛔ Đã dừng"); SLC("action", Color3.fromRGB(255, 80, 80))
 end)
+
 task.spawn(function()
     while task.wait(10) do
         if not getgenv().PreDetect.Running then break end
         UL("server", "🖥️ Server: " .. string.sub(JobId, 1, 20) .. "...")
     end
 end)
+
 -- ==========================================
 -- [A] DETECT LOCATE PLAYER — ANTI-STUCK
 -- ==========================================
+--[[
+    Cơ chế:
+    - Mỗi 5 giây ghi nhận vị trí player hiện tại
+    - So sánh với vị trí lần trước:
+      • Nếu di chuyển ≥ 15 studs → reset timer (player đang hoạt động bình thường)
+      • Nếu di chuyển < 15 studs → cộng dồn thời gian stuck
+    - Ngưỡng shutdown:
+      • Không có đảo Pre → stuck 2 phút (120s) → shutdown
+      • Có đảo Pre       → stuck 5 phút (300s) → shutdown
+    - Hiển thị countdown trên UI dòng "stuck"
+]]
+
 task.spawn(function()
     task.wait(10) -- Chờ game ổn định
-    local lastPosition = nil -- Vị trí lần check trước
-    local stuckTime = 0 -- Tổng giây đã stuck
+
+    local lastPosition = nil    -- Vị trí lần check trước
+    local stuckTime = 0         -- Tổng giây đã stuck
     local cfg = getgenv().PreDetect
+
     print("[AntiStuck] 📍 Bắt đầu theo dõi vị trí player...")
+
     while cfg.Running do
         local ok, currentPos = pcall(function()
             return LocalPlayer.Character
                 and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                 and LocalPlayer.Character.HumanoidRootPart.Position
         end)
+
         if ok and currentPos then
+            -- Tính khoảng cách so với lần check trước
             local moved = 0
             if lastPosition then
                 moved = (currentPos - lastPosition).Magnitude
             end
+
+            -- Check đảo Pre có hay không → chọn ngưỡng
             local hasIsland = IsIslandSpawned() or IsIslandLoaded()
-            local threshold = hasIsland and cfg.StuckThreshold_HasIsland or cfg.StuckThreshold_NoIsland
+            local threshold = hasIsland
+                and cfg.StuckThreshold_HasIsland   -- 300s (5 phút)
+                or  cfg.StuckThreshold_NoIsland     -- 120s (2 phút)
+
+            -- Player đã di chuyển đủ xa → reset
             if lastPosition == nil or moved >= cfg.StuckMoveDistance then
                 stuckTime = 0
                 lastPosition = currentPos
             else
+                -- Chưa di chuyển → cộng thời gian stuck
                 stuckTime = stuckTime + cfg.StuckCheckInterval
             end
+
+            -- Tính thời gian còn lại trước khi shutdown
             local remaining = threshold - stuckTime
             local remainMin = math.floor(remaining / 60)
             local remainSec = remaining % 60
+
+            -- Cập nhật UI
             if stuckTime == 0 then
+                -- Vừa di chuyển → xanh
                 UL("stuck", "📍 Stuck: ✅ Đang di chuyển")
                 SLC("stuck", Color3.fromRGB(80, 255, 80))
             elseif remaining > 30 then
-                UL("stuck", string.format("📍 Stuck: ⚠️ %ds/%ds | %s | Shutdown: %d:%02d", stuckTime, threshold, hasIsland and "Có đảo" or "Không đảo", remainMin, remainSec))
+                -- Stuck nhưng còn nhiều thời gian → vàng
+                UL("stuck", string.format(
+                    "📍 Stuck: ⚠️ %ds/%ds | %s | Shutdown: %d:%02d",
+                    stuckTime, threshold,
+                    hasIsland and "Có đảo" or "Không đảo",
+                    remainMin, remainSec
+                ))
                 SLC("stuck", Color3.fromRGB(255, 200, 50))
             else
-                UL("stuck", string.format("📍 Stuck: 🔴 %ds/%ds | SHUTDOWN trong %d:%02d!", stuckTime, threshold, remainMin, remainSec))
+                -- Sắp shutdown → đỏ
+                UL("stuck", string.format(
+                    "📍 Stuck: 🔴 %ds/%ds | SHUTDOWN trong %d:%02d!",
+                    stuckTime, threshold,
+                    remainMin, remainSec
+                ))
                 SLC("stuck", Color3.fromRGB(255, 80, 80))
             end
+
+            -- ★ ĐÃ STUCK QUÁ NGƯỠNG → SHUTDOWN
             if stuckTime >= threshold then
-                local reason = string.format("Player stuck %ds (ngưỡng %ds, %s) → Shutdown", stuckTime, threshold, hasIsland and "có đảo Pre" or "không có đảo")
+                local reason = string.format(
+                    "Player stuck %ds (ngưỡng %ds, %s) → Shutdown",
+                    stuckTime, threshold,
+                    hasIsland and "có đảo Pre" or "không có đảo"
+                )
                 warn("[AntiStuck] 🔴 " .. reason)
                 UL("stuck", "📍 🔴 SHUTDOWN: " .. reason)
                 SLC("stuck", Color3.fromRGB(255, 0, 0))
@@ -496,13 +575,17 @@ task.spawn(function()
                 return
             end
         else
+            -- Không lấy được vị trí (character chưa load)
             UL("stuck", "📍 Stuck: ⏳ Chờ character...")
             SLC("stuck", Color3.fromRGB(220, 220, 240))
             stuckTime = 0
             lastPosition = nil
         end
+
         task.wait(cfg.StuckCheckInterval)
     end
+
     print("[AntiStuck] ⛔ Đã dừng")
 end)
+
 print("[PreDetect] Loaded! Dừng: getgenv().PreDetect.Running = false")
