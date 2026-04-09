@@ -64,9 +64,9 @@ getgenv().PreDetect = {
     HopIfOthersOnIsland = true, -- Tự hop nếu có người khác sau trial xong
 
     -- [A] Detect Locate Player — Anti-Stuck
-    StuckThreshold_NoIsland = 120,   -- 2 phút (không có đảo Pre)
-    StuckThreshold_HasIsland = 300,  -- 5 phút (có đảo Pre)
-    StuckMoveDistance = 15,          -- Phải di chuyển ít nhất 15 studs mới tính là "đã di chuyển"
+    StuckThreshold_NoIsland = 350,   -- 2 phút (không có đảo Pre)
+    StuckThreshold_HasIsland = 700,  -- 5 phút (có đảo Pre)
+    StuckMoveDistance = 5,          -- Phải di chuyển ít nhất 15 studs mới tính là "đã di chuyển"
     StuckCheckInterval = 5,          -- Check vị trí mỗi 5 giây
 }
 
