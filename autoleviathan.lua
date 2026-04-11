@@ -187,6 +187,30 @@ StartBtn.Visible = false
 Instance.new("UICorner", StartBtn).CornerRadius = UDim.new(0, 6)
 
 -- ==========================================
+-- [ DANH SÁCH ACC MAIN BOAT ]
+-- ==========================================
+local OwnerList = {
+    "ashleycraig7734",
+    "annasolis7667",
+    "arthurmills71535",
+    "annealvarado27936",
+    "bearcrafthyper200292",
+    "ananielsen801",
+    "alexbishop97",
+    "aimeepratt07",
+    "abigailgalaxymax54",
+    "annvelez091"
+}
+
+local function IsOwner(name)
+    local lower = name:lower()
+    for _, v in ipairs(OwnerList) do
+        if lower == v then return true end
+    end
+    return false
+end
+
+-- ==========================================
 -- LOGIC: WAIT 15S → SEA 3 → BUY DRAGON TALON → DETECT OWNER
 -- ==========================================
 task.spawn(function()
@@ -271,36 +295,35 @@ task.spawn(function()
         -- ========================================
         local function GetOwnerInServer()
             for _, p in ipairs(services.Players:GetPlayers()) do
-                local name = p.Name:lower()
-                if name == "ashleycraig7734" or name == "annasolis7667" or name == "arthurmills71535" or name == "bearcrafthyper200292" then 
-                    return p.Name 
+                if IsOwner(p.Name) then
+                    return p.Name
                 end
             end
             return nil
         end
 
-        if Player.Name:lower() ~= "ashleycraig7734" and Player.Name:lower() ~= "annasolis7667" and Player.Name:lower() ~= "arthurmills71535" and Player.Name:lower() ~= "bearcrafthyper200292" then
+        if not IsOwner(Player.Name) then
             -- ========================================
             -- ACC KHÁCH: Quét owner → load script
             -- ========================================
             local foundOwner = nil
             local timeLeft = 20
-            
+
             while timeLeft > 0 do
                 foundOwner = GetOwnerInServer()
                 if foundOwner then break end
-                
+
                 StatusLabel.Text = string.format("Scanning for Owner...\nTime left: %ds", timeLeft)
                 StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
-                
+
                 task.wait(2)
                 timeLeft = timeLeft - 2
             end
-            
+
             if foundOwner then
                 StatusLabel.Text = "Owner Found: " .. foundOwner .. "\nExecuting Leviathan Script..."
                 StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-                
+
                 task.spawn(function()
                     getgenv().Key = NhapKey
                     getgenv().Config = {
