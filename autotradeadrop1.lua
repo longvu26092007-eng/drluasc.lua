@@ -578,7 +578,7 @@ btnTichHop.MouseButton1Click:Connect(function()
     status.Text = "⚡ [1/4] Collect Fruits..."
     pcall(function() collectFruits(true) end)
     status.Text = "⚡ [1/4] Collect xong! Đợi 1s..."
-    task.wait(1)
+    task.wait(2)
 
     -- BƯỚC 2: GO TO COORD
     status.Text = "⚡ [2/4] Go to Coord..."
@@ -586,13 +586,13 @@ btnTichHop.MouseButton1Click:Connect(function()
     toposition(EXTRA_POS, function() goFinished = true end)
     repeat task.wait(0.1) until goFinished
     status.Text = "⚡ [2/4] Đã tới! Đợi 1s..."
-    task.wait(1)
+    task.wait(2)
 
     -- BƯỚC 3: DROP FRUITS
     status.Text = "⚡ [3/4] Drop Fruits..."
     pcall(function() DropFruits() end)
     status.Text = "⚡ [3/4] Drop xong! Đợi 1s..."
-    task.wait(1)
+    task.wait(2)
 
     -- BƯỚC 4: CLAIM QUEST (GO DOJO)
     status.Text = "⚡ [4/4] Bay lên Dojo Claim..."
@@ -602,7 +602,7 @@ btnTichHop.MouseButton1Click:Connect(function()
         claimQuest()
         claimFinished = true
     end)
-    repeat task.wait(0.1) until claimFinished
+    repeat task.wait(0.5) until claimFinished
     status.Text = "⚡ TÍCH HỢP HOÀN TẤT!"
 
     task.wait(1)
