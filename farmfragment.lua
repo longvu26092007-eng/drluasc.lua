@@ -3,6 +3,15 @@
 -- Chức năng: Chọn Team (UI Click) -> Farm Fragment đến khi đủ 8000 -> Ghi file
 -- ==========================================
 
+-- [[ KEY CHECK ]]
+local NhapKey = getgenv().Key
+
+if not NhapKey or NhapKey == "" then
+    warn("[FarmFrag] ❌ Chưa set getgenv().Key ở executor! Hủy script.")
+    return
+end
+warn("[FarmFrag] ✅ Key nhận được: " .. string.sub(NhapKey, 1, 6) .. "***")
+
 -- [[ CONFIG ]]
 getgenv().Team = getgenv().Team or "Marines"
 local FRAGMENT_MIN = 10000
@@ -111,7 +120,7 @@ FragLabel.TextXAlignment         = Enum.TextXAlignment.Left
 
 local function RunFarmFragment()
     repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
-    getgenv().Key    = "51e126ee832d3c4fff7b6178"
+    getgenv().Key    = NhapKey
     getgenv().NewUI  = true
     getgenv().Config = {
         ["Select Method Farm"] = "Farm Katakuri",
