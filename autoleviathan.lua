@@ -1,5 +1,5 @@
 -- [[ VU NGUYEN KAITUN LEVI - MULTI-SCRIPT SUPPORT ]]
--- Chức năng: AUTO TEAM -> WAIT 15S -> AUTO SEA 3 -> DETECT OWNER -> AUTO KICK
+-- Chức năng: AUTO TEAM -> WAIT 15S -> AUTO SEA 3 -> AUTO BUY DRAGON TALON -> DETECT OWNER -> AUTO KICK
 
 -- ==========================================
 -- [ KEY CHECK ]
@@ -71,6 +71,83 @@ local SEA_2 = {["4442272183"] = true, ["79091703265657"] = true}
 local SEA_3 = {["7449423635"] = true, ["100117331123089"] = true}
 
 -- ==========================================
+-- [ DRAGON TALON - CHECK & BUY ]
+-- ==========================================
+local Uzoth_CFrame = CFrame.new(5661.898, 1210.877, 863.176)
+
+local function CheckDragonTalon()
+    local char = Player.Character
+    local bp = Player:FindFirstChild("Backpack")
+    return (char and char:FindFirstChild("Dragon Talon"))
+        or (bp and bp:FindFirstChild("Dragon Talon"))
+end
+
+local function TweenTo(targetCFrame)
+    local char = Player.Character or Player.CharacterAdded:Wait()
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return false end
+
+    local hrp = char:WaitForChild("HumanoidRootPart")
+    local hum = char:WaitForChild("Humanoid")
+
+    local distance = (hrp.Position - targetCFrame.Position).Magnitude
+    if distance <= 250 then
+        hrp.CFrame = targetCFrame
+        return true
+    end
+
+    local bv = hrp:FindFirstChild("LeviAntiGrav") or Instance.new("BodyVelocity")
+    bv.Name = "LeviAntiGrav"
+    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bv.Velocity = Vector3.new(0, 0, 0)
+    bv.Parent = hrp
+
+    local tweenObj = services.TweenService:Create(hrp, TweenInfo.new(distance / 300, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
+
+    local noclip
+    noclip = services.RunService.Stepped:Connect(function()
+        if hum and hum.Parent then hum:ChangeState(11) end
+        if char and char.Parent then
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BasePart") and part.CanCollide then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end)
+
+    tweenObj:Play()
+    tweenObj.Completed:Wait()
+
+    if bv and bv.Parent then bv:Destroy() end
+    if noclip then noclip:Disconnect() end
+
+    if hum and hum.Parent and hum.Health > 0 then
+        hum:ChangeState(8)
+        return true
+    end
+    return false
+end
+
+local function DoBuyDragonTalon()
+    pcall(function()
+        local check = services.CommF:InvokeServer("BuyDragonTalon", true)
+        if check == 3 then
+            services.CommF:InvokeServer("Bones", "Buy", 1, 1)
+            task.wait(0.3)
+            services.CommF:InvokeServer("BuyDragonTalon", true)
+        elseif check == 1 then
+            services.CommF:InvokeServer("BuyDragonTalon")
+        else
+            services.CommF:InvokeServer("Bones", "Buy", 1, 1)
+            task.wait(0.3)
+            services.CommF:InvokeServer("BuyDragonTalon", true)
+            task.wait(0.3)
+            services.CommF:InvokeServer("BuyDragonTalon")
+        end
+    end)
+end
+
+-- ==========================================
 -- MONITOR UI (RIGHT SIDE - GOLD/BLACK)
 -- ==========================================
 local ScreenGui = Instance.new("ScreenGui", services.CoreGui)
@@ -134,7 +211,7 @@ local function IsOwner(name)
 end
 
 -- ==========================================
--- LOGIC: WAIT 15S → SEA 3 → DETECT OWNER
+-- LOGIC: WAIT 15S → SEA 3 → BUY DRAGON TALON → DETECT OWNER
 -- ==========================================
 task.spawn(function()
 
@@ -165,10 +242,57 @@ task.spawn(function()
     end
 
     -- ========================================
-    -- BƯỚC 2: LOGIC QUÉT OWNER (CHỈ SEA 3)
+    -- BƯỚC 2: CHECK & MUA DRAGON TALON (CHỈ Ở SEA 3)
     -- ========================================
     if SEA_3[PlaceId] then
+        if CheckDragonTalon() then
+            StatusLabel.Text = "Dragon Talon: ✅ Đã có\nTiếp tục..."
+            StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+            warn("[Levi] Dragon Talon đã có, bỏ qua.")
+            task.wait(1)
+        else
+            local maxRetry = 5
+            for attempt = 1, maxRetry do
+                if CheckDragonTalon() then break end
 
+                StatusLabel.Text = "Dragon Talon: ❌ Chưa có\nĐang bay đến NPC... (" .. attempt .. "/" .. maxRetry .. ")"
+                StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
+                warn("[Levi] Chưa có Dragon Talon, bay đến NPC (lần " .. attempt .. ")")
+
+                local arrived = TweenTo(Uzoth_CFrame)
+                if arrived then
+                    StatusLabel.Text = "Dragon Talon: Đang mua..."
+                    task.wait(0.5)
+                    DoBuyDragonTalon()
+                    task.wait(1)
+
+                    if CheckDragonTalon() then
+                        StatusLabel.Text = "Dragon Talon: ✅ Mua thành công!"
+                        StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+                        warn("[Levi] Mua Dragon Talon thành công!")
+                        task.wait(1)
+                        break
+                    else
+                        StatusLabel.Text = "Dragon Talon: Mua thất bại, thử lại..."
+                        warn("[Levi] Mua thất bại, retry...")
+                    end
+                else
+                    StatusLabel.Text = "Dragon Talon: Bay thất bại, thử lại..."
+                end
+                task.wait(3)
+            end
+
+            if not CheckDragonTalon() then
+                StatusLabel.Text = "Dragon Talon: ⚠ Không mua được!\nTiếp tục script..."
+                StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+                warn("[Levi] Không mua được Dragon Talon sau " .. maxRetry .. " lần. Tiếp tục.")
+                task.wait(2)
+            end
+        end
+
+        -- ========================================
+        -- BƯỚC 3: LOGIC QUÉT OWNER (CHỈ SEA 3)
+        -- ========================================
         local function GetOwnerInServer()
             for _, p in ipairs(services.Players:GetPlayers()) do
                 if IsOwner(p.Name) then
