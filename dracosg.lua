@@ -728,6 +728,8 @@ do
             ["Select Weapon"] = "Sword",
             ["Select Method Farm"] = "Farm Bones",
             ["Start Farm"] = true,
+            ["Remove Notifications"] = true,
+            ["Black Screen"] = true,
         })
         repeat
             task.wait(10)
@@ -798,6 +800,8 @@ do
                 ["Health %"] = "45",
                 ["Farm Mastery"] = true,
                 ["Start Farm"] = true,
+                ["Black Screen"] = true,
+                ["Remove Notifications"] = true, 
             })
             repeat
                 task.wait(10)
