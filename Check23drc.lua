@@ -7,40 +7,41 @@
 if getgenv().TC then pcall(getgenv().TC) end
 
 -- ==========================================
--- [ ĐỢI GAME LOAD → TEAM → SCRIPT ]
+-- [ GAME LOAD - Source_SG Style ]
 -- ==========================================
-if not game:IsLoaded() then
-    game.Loaded:Wait()
-end
-repeat task.wait() until game.Players.LocalPlayer
-repeat task.wait() until game.Players.LocalPlayer:FindFirstChild("PlayerGui")
+repeat task.wait(0.5) until game:IsLoaded()
+    and game.Players.LocalPlayer
+    and game.Players.LocalPlayer:FindFirstChildWhichIsA("PlayerGui")
 
--- Đợi chọn team
-if game.Players.LocalPlayer.Team == nil then
-    repeat
-        task.wait()
-        for _, v in pairs(game.Players.LocalPlayer.PlayerGui:GetChildren()) do
-            if string.find(v.Name, "Main") then
-                pcall(function()
-                    local teamName = getgenv().Team or "Marines"
-                    local teamBtn = v.ChooseTeam.Container[teamName].Frame.TextButton
-                    teamBtn.Size     = UDim2.new(0, 10000, 0, 10000)
-                    teamBtn.Position = UDim2.new(-4, 0, -5, 0)
-                    teamBtn.BackgroundTransparency = 1
-                    task.wait(0.5)
-                    game:GetService("VirtualInputManager"):SendMouseButtonEvent(0, 0, 0, true, game, 1)
-                    task.wait(0.05)
-                    game:GetService("VirtualInputManager"):SendMouseButtonEvent(0, 0, 0, false, game, 1)
-                end)
+getgenv().cloneref = cloneref or clonereference or function(x) return x end
+workspace = cloneref(workspace) or cloneref(Workspace)
+    or (getrenv and (getrenv().workspace or getrenv().Workspace))
+    or cloneref(game:GetService("Workspace"))
+
+local COMMF_ = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CommF_")
+local LocalPlayer = game.Players.LocalPlayer
+
+-- [ CHỌN TEAM - Source_SG Style ]
+task.spawn(function()
+    xpcall(function()
+        if not LocalPlayer.Team then
+            if LocalPlayer.PlayerGui:FindFirstChild("LoadingScreen") then
+                repeat task.wait(1) until not LocalPlayer.PlayerGui:FindFirstChild("LoadingScreen")
             end
+            xpcall(function()
+                COMMF_:InvokeServer("SetTeam", getgenv().Team or "Marines")
+            end, function()
+                firesignal(LocalPlayer.PlayerGui["Main (minimal)"].ChooseTeam.Container[getgenv().Team or "Marines"])
+            end)
+            task.wait(2)
         end
-    until game.Players.LocalPlayer.Team ~= nil and game:IsLoaded()
-    task.wait(3)
-end
+    end, function(err) warn("????", err) end)
+end)
 
-repeat task.wait() until game.Players.LocalPlayer.Character
-    and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-task.wait(2)
+repeat task.wait(2) until LocalPlayer.Character
+    and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    and LocalPlayer.Character:FindFirstChildWhichIsA("Humanoid")
+    and LocalPlayer.Character:IsDescendantOf(workspace.Characters)
 
 -- ==========================================
 -- [ SCRIPT BẮT ĐẦU ]
@@ -218,7 +219,6 @@ end
 
 -- Scan
 local function DoScan()
-    -- Mở bảng Titles
     pcall(function()
         local CommF_ = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CommF_")
         CommF_:InvokeServer("getTitles")
@@ -230,7 +230,6 @@ local function DoScan()
 
     task.wait(1)
 
-    -- Scan text
     local foundTexts = {}
     pcall(function()
         local m = playerGui:FindFirstChild("Main")
@@ -246,13 +245,11 @@ local function DoScan()
         end
     end)
 
-    -- Đóng bảng Titles
     pcall(function()
         local m = playerGui:FindFirstChild("Main")
         if m and m:FindFirstChild("Titles") then m.Titles.Visible = false end
     end)
 
-    -- Check
     for _, item in ipairs(CheckList) do
         local ok = foundTexts[item.t] or false
         if not ok then ok = foundTexts[item.t:sub(1, -2)] or false end
