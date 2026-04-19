@@ -14,7 +14,7 @@ warn("[FarmFrag] ✅ Key nhận được: " .. string.sub(NhapKey, 1, 6) .. "***
 
 -- [[ CONFIG ]]
 getgenv().Team = getgenv().Team or "Marines"
-local FRAGMENT_MIN = 10000
+local FRAGMENT_MIN = 4000
 
 -- ==========================================
 -- [ PHẦN 0 : CHỌN TEAM & ĐỢI GAME LOAD ]
