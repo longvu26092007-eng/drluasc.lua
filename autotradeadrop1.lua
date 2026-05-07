@@ -586,7 +586,7 @@ btnTichHop.MouseButton1Click:Connect(function()
     toposition(EXTRA_POS, function() goFinished = true end)
     repeat task.wait(0.1) until goFinished
     status.Text = "⚡ [2/4] Đã tới! Đợi 1s..."
-    task.wait(1.5)
+    task.wait(1)
 
 -- BƯỚC 3: DROP FRUITS (Thực hiện 2 lần)
     status.Text = "⚡ [3/4] Drop Fruits (Lần 1)..."
