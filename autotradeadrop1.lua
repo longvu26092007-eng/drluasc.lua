@@ -521,6 +521,55 @@ task.spawn(function()
     end)
 end)
 
+-- Định nghĩa hàm chạy tích hợp để dùng chung cho Button và Phím tắt
+local function runTichHopLogic()
+    if busy then return end
+    busy = true; lockDojoButtons(true)
+    btnTichHop.Text = "⚡ ĐANG CHẠY..."
+    btnTichHop.BackgroundColor3 = Color3.fromRGB(100, 70, 0)
+
+    -- BƯỚC 1: COLLECT FRUITS
+    status.Text = "⚡ [1/4] Collect Fruits..."
+    pcall(function() collectFruits(true) end)
+    status.Text = "⚡ [1/4] Collect xong! Đợi 1.5s..."
+    task.wait(1.5)
+
+    -- BƯỚC 2: GO TO COORD
+    status.Text = "⚡ [2/4] Go to Coord..."
+    local goFinished = false
+    toposition(EXTRA_POS, function() goFinished = true end)
+    repeat task.wait(0.1) until goFinished
+    status.Text = "⚡ [2/4] Đã tới! Đợi 1s..."
+    task.wait(1)
+
+    -- BƯỚC 3: DROP FRUITS (Thực hiện 2 lần)
+    status.Text = "⚡ [3/4] Drop Fruits (Lần 1)..."
+    pcall(function() DropFruits() end)
+    task.wait(1) 
+    
+    status.Text = "⚡ [3/4] Drop Fruits (Lần 2)..."
+    pcall(function() DropFruits() end)
+    
+    status.Text = "⚡ [3/4] Drop xong 2 lần! Đợi 1s..."
+    task.wait(1)
+
+    -- BƯỚC 4: CLAIM QUEST (GO DOJO)
+    status.Text = "⚡ [4/4] Bay lên Dojo Claim..."
+    local claimFinished = false
+    toposition(DOJO_POS, function()
+        task.wait(0.25)
+        claimQuest()
+        claimFinished = true
+    end)
+    repeat task.wait(0.5) until claimFinished
+    status.Text = "⚡ TÍCH HỢP HOÀN TẤT!"
+
+    task.wait(1)
+    btnTichHop.Text = "⚡ TÍCH HỢP"
+    btnTichHop.BackgroundColor3 = Color3.fromRGB(60, 40, 0)
+    lockDojoButtons(false); busy = false
+end
+
 btnClaim.MouseButton1Click:Connect(function()
     if busy then return end; busy = true; lockDojoButtons(true)
     btnClaim.Text = "RUNNING..."; status.Text = "Bay lên Dojo..."
@@ -565,56 +614,7 @@ btnRandom.MouseButton1Click:Connect(function()
     task.wait(0.8); btnRandom.Text = "RANDOM FRUIT"; lockDojoButtons(false); busy = false
 end)
 
--- ==========================================
--- TÍCH HỢP: Collect → 1s → Go → 1s → Drop → 1s → Claim
--- ==========================================
-btnTichHop.MouseButton1Click:Connect(function()
-    if busy then return end
-    busy = true; lockDojoButtons(true)
-    btnTichHop.Text = "⚡ ĐANG CHẠY..."
-    btnTichHop.BackgroundColor3 = Color3.fromRGB(100, 70, 0)
-
-    -- BƯỚC 1: COLLECT FRUITS
-    status.Text = "⚡ [1/4] Collect Fruits..."
-    pcall(function() collectFruits(true) end)
-    status.Text = "⚡ [1/4] Collect xong! Đợi 1s..."
-    task.wait(1.5)
-
-    -- BƯỚC 2: GO TO COORD
-    status.Text = "⚡ [2/4] Go to Coord..."
-    local goFinished = false
-    toposition(EXTRA_POS, function() goFinished = true end)
-    repeat task.wait(0.1) until goFinished
-    status.Text = "⚡ [2/4] Đã tới! Đợi 1s..."
-    task.wait(1)
-
--- BƯỚC 3: DROP FRUITS (Thực hiện 2 lần)
-    status.Text = "⚡ [3/4] Drop Fruits (Lần 1)..."
-    pcall(function() DropFruits() end)
-    task.wait(1) -- Đợi một chút để hệ thống xử lý lượt drop đầu
-    
-    status.Text = "⚡ [3/4] Drop Fruits (Lần 2)..."
-    pcall(function() DropFruits() end)
-    
-    status.Text = "⚡ [3/4] Drop xong 2 lần! Đợi 1s..."
-    task.wait(1)
-
-    -- BƯỚC 4: CLAIM QUEST (GO DOJO)
-    status.Text = "⚡ [4/4] Bay lên Dojo Claim..."
-    local claimFinished = false
-    toposition(DOJO_POS, function()
-        task.wait(0.25)
-        claimQuest()
-        claimFinished = true
-    end)
-    repeat task.wait(0.5) until claimFinished
-    status.Text = "⚡ TÍCH HỢP HOÀN TẤT!"
-
-    task.wait(1)
-    btnTichHop.Text = "⚡ TÍCH HỢP"
-    btnTichHop.BackgroundColor3 = Color3.fromRGB(60, 40, 0)
-    lockDojoButtons(false); busy = false
-end)
+btnTichHop.MouseButton1Click:Connect(runTichHopLogic)
 
 task.spawn(function()
     while task.wait(0.5) do
@@ -636,6 +636,12 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.RightControl then
         gui.Enabled = not gui.Enabled; return
     end
+    
+    -- Gán phím 0 để chạy Tích Hợp
+    if input.KeyCode == Enum.KeyCode.Zero or input.KeyCode == Enum.KeyCode.NumberPadZero then
+        runTichHopLogic()
+    end
+    
     local chairIndex = CHAIR_KEY_MAP[input.KeyCode]
     if chairIndex then goToChair(chairIndex) end
 end)
