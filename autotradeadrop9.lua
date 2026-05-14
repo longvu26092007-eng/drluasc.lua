@@ -50,16 +50,6 @@ local SEATS = {
     {Name = "Chair 6", CFrame = CFrame.new(-12602.312500, 337.442780, -7568.756836)},
 }
 
--- Bảng ánh xạ phím tắt (Hàng ngang + Numpad)
-local CHAIR_KEY_MAP = {
-    [Enum.KeyCode.One] = 1, [Enum.KeyCode.NumberPadOne] = 1,
-    [Enum.KeyCode.Two] = 2, [Enum.KeyCode.NumberPadTwo] = 2,
-    [Enum.KeyCode.Three] = 3, [Enum.KeyCode.NumberPadThree] = 3,
-    [Enum.KeyCode.Four] = 4, [Enum.KeyCode.NumberPadFour] = 4,
-    [Enum.KeyCode.Five] = 5, [Enum.KeyCode.NumberPadFive] = 5,
-    [Enum.KeyCode.Six] = 6, [Enum.KeyCode.NumberPadSix] = 6,
-}
-
 local DOJO_POS  = CFrame.new(5862.036621, 1208.302124, 872.385437)
 local EXTRA_POS = CFrame.new(5801.733887, 1208.568481, 877.088684)
 local AFTER_QUEST_POS = CFrame.new(-12545.984375, 337.190063, -7546.318848)
@@ -636,7 +626,7 @@ task.spawn(function()
     end
 end)
 
--- Xử lý phím bấm tập trung
+-- Xử lý phím bấm tập trung (Đã sửa lỗi Enum phím số)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     
@@ -646,23 +636,23 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         return
     end
 
-    -- Nếu đang bận chạy một task nào đó (busy) thì không nhận lệnh phím số để tránh lỗi tele
+    -- Nếu đang bận chạy một task nào đó thì không nhận lệnh phím số
     if busy then return end
 
-    -- Xử lý Phím 0: Tích hợp (Nhận cả phím 0 ngang và 0 Numpad)
-    if input.KeyCode == Enum.KeyCode.Zero or input.KeyCode == Enum.KeyCode.NumberPadZero then
+    -- Xử lý Phím 0: Tích hợp (Nhận cả phím 0 ngang và 0 Numpad/Keypad)
+    if input.KeyCode == Enum.KeyCode.Zero or input.KeyCode == Enum.KeyCode.KeypadZero then
         runTichHopLogic()
         return
     end
     
-    -- Xử lý Phím 1-6: Bay tới ghế (Nhận cả phím ngang và Numpad)
+    -- Xử lý Phím 1-6: Bay tới ghế (Nhận cả phím ngang và Keypad)
     local keymap = {
-        [Enum.KeyCode.One] = 1, [Enum.KeyCode.NumberPadOne] = 1,
-        [Enum.KeyCode.Two] = 2, [Enum.KeyCode.NumberPadTwo] = 2,
-        [Enum.KeyCode.Three] = 3, [Enum.KeyCode.NumberPadThree] = 3,
-        [Enum.KeyCode.Four] = 4, [Enum.KeyCode.NumberPadFour] = 4,
-        [Enum.KeyCode.Five] = 5, [Enum.KeyCode.NumberPadFive] = 5,
-        [Enum.KeyCode.Six] = 6, [Enum.KeyCode.NumberPadSix] = 6,
+        [Enum.KeyCode.One] = 1, [Enum.KeyCode.KeypadOne] = 1,
+        [Enum.KeyCode.Two] = 2, [Enum.KeyCode.KeypadTwo] = 2,
+        [Enum.KeyCode.Three] = 3, [Enum.KeyCode.KeypadThree] = 3,
+        [Enum.KeyCode.Four] = 4, [Enum.KeyCode.KeypadFour] = 4,
+        [Enum.KeyCode.Five] = 5, [Enum.KeyCode.KeypadFive] = 5,
+        [Enum.KeyCode.Six] = 6, [Enum.KeyCode.KeypadSix] = 6,
     }
 
     local chairIndex = keymap[input.KeyCode]
