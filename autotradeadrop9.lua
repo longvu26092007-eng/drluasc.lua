@@ -540,14 +540,16 @@ local function runTichHopLogic()
     -- BƯỚC 3: DROP FRUITS (Thực hiện 2 lần)
     status.Text = "⚡ [3/4] Drop Fruits (Lần 1)..."
     pcall(function() DropFruits() end)
+    pcall(function() DropFruits() end)
     task.wait(1) 
     
     status.Text = "⚡ [3/4] Drop Fruits (Lần 2)..."
     pcall(function() DropFruits() end)
+    pcall(function() DropFruits() end)
     
     status.Text = "⚡ [3/4] Drop xong 2 lần! Đợi 1s..."
     task.wait(1)
-
+    
     -- BƯỚC 4: CLAIM QUEST (GO DOJO)
     status.Text = "⚡ [4/4] Bay lên Dojo Claim..."
     local claimFinished = false
