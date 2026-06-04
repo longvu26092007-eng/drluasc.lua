@@ -370,22 +370,30 @@ task.spawn(function()
                         end
 
                         if heartCount >= 1 then
-    StatusLabel.Text = "💎 Leviathan Heart: " .. heartCount .. " → Ghi file!"
-    StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-    warn("[Levi] Phát hiện Leviathan Heart x" .. heartCount .. "! Ghi file...")
+                            StatusLabel.Text = "💎 Leviathan Heart: " .. heartCount .. " → Ghi file!"
+                            StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+                            warn("[Levi] Phát hiện Leviathan Heart x" .. heartCount .. "! Ghi file...")
 
-    pcall(function()
-        writefile(Player.Name .. ".txt", "Completed-heart")
-    end)
-    warn("[Levi] Đã ghi file: " .. Player.Name .. ".txt → Completed-heart")
+                            pcall(function()
+                                writefile(Player.Name .. ".txt", "Completed-heart")
+                            end)
+                            warn("[Levi] Đã ghi file: " .. Player.Name .. ".txt → Completed-heart")
 
-    getgenv().CustomChange = true  -- ← THÊM VÀO ĐÂY
-    warn("[Levi] Đã set getgenv().CustomChange = true")
+                            getgenv().CustomChange = true
+                            warn("[Levi] Đã set getgenv().CustomChange = true")
 
-    StatusLabel.Text = "✅ Completed-heart!\n📄 " .. Player.Name .. ".txt"
-    StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-    break
-end
+                            StatusLabel.Text = "✅ Completed-heart!\n📄 " .. Player.Name .. ".txt"
+                            StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+                            break
+                        end
+                    end
+                end)
+            else
+                StatusLabel.Text = "No Owner detected. Auto Kicking..."
+                StatusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+                task.wait(2)
+                Player:Kick("Không tìm thấy chủ tàu sau 20s quét.")
+            end
         else
             -- ========================================
             -- CHỦ THUYỀN: Countdown 190s + Button bật sớm
