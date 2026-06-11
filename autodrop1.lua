@@ -30,6 +30,11 @@ local RADIUS = tonumber(getgenv().radius) or 100
 local MY_SLOT   = nil   -- slot hiện tại của mình (số), nil nếu chưa có
 local SLOT_LIST = {}    -- danh sách player cùng team đang gần, sort theo UserId
 
+--// Forward-declare hàm cập nhật UI (định nghĩa thật ở phần UI bên dưới).
+--// Khai báo trước để các hàm ở giữa (recomputeSlot...) tham chiếu đúng,
+--// tránh bind nhầm vào global nil.
+local SetStatus, SetSlot
+
 --// cloneref an toàn (fallback nếu executor không có)
 getgenv().cloneref = cloneref or clonereference or function(x) return x end
 
@@ -606,12 +611,12 @@ StatusLabel.TextWrapped            = true
 StatusLabel.RichText               = true
 StatusLabel.Parent                 = StatusFrame
 
---// Hàm cập nhật UI
-local function SetStatus(text)
+--// Hàm cập nhật UI (gán vào biến đã forward-declare ở đầu)
+function SetStatus(text)
     StatusLabel.Text = text
     print("[AutoDrop] " .. text)
 end
-local function SetSlot(text)
+function SetSlot(text)
     SlotLabel.Text = text
 end
 
