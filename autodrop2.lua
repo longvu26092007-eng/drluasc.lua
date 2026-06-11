@@ -737,17 +737,40 @@ toposition(DOJO_POS, function()
         repeat task.wait(0.2) w = w + 0.2 until arrived or w >= 10
     end
 
-    --// Feeder mua (nếu chưa có) + thả seed
+    --// Feeder mua (nếu chưa có) + thả seed.
+    --// LƯU Ý: Cousin "Buy" làm fruit RƠI XUỐNG ĐẤT, không vào backpack.
+    --// Phải nhặt fruit dưới đất vào túi (kéo Handle về người tới khi inventory
+    --// tăng) RỒI mới Drop ra (giống Buy -> TeleportToFruits -> DropAllBackpackFruits).
     local function seedFruit()
-        SetStatus("🍈 [Feeder] Mua fruit + thả seed...")
+        SetStatus("🍈 [Feeder] Bay tới điểm drop...")
         goDrop()
-        if countOwnedFruits() == 0 then randomFruit(); task.wait(1.5) end
+
+        -- Mua nếu trong túi chưa có fruit nào
+        if countOwnedFruits() == 0 then
+            SetStatus("🍈 [Feeder] Mua fruit (Cousin Buy)...")
+            randomFruit()
+            task.wait(1.5)
+        end
+
+        -- Nhặt fruit vừa mua (đang nằm dưới đất) vào backpack
+        local before = countOwnedFruits()
+        if countFruitsOnGround() > 0 or before == 0 then
+            SetStatus("🍈 [Feeder] Nhặt fruit vừa mua vào túi...")
+            local t = 0
+            repeat
+                collectFruits()
+                task.wait(0.4)
+                t = t + 0.4
+            until countOwnedFruits() > before or t >= 6
+        end
+
+        -- Giờ mới thả ra đất để người khác nhặt
         if DropFruits() > 0 then
             hasSeeded = true
             seedReleased = false
             SetStatus("🍈 [Feeder] Đã seed. Chờ người khác nhặt.")
         else
-            SetStatus("⚠️ [Feeder] Seed thất bại (không có fruit để thả).")
+            SetStatus("⚠️ [Feeder] Seed thất bại - thử lại lượt sau.")
         end
     end
 
