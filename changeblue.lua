@@ -25,7 +25,7 @@ local function CreateMiniUI()
     end
 
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "GreenBeltStatusUI"
+    ScreenGui.Name = "BlueBeltStatusUI"
     ScreenGui.Parent = SafeGuiParent
     ScreenGui.ResetOnSpawn = false
 
@@ -71,7 +71,7 @@ local StatusLabel, MainFrame, Stroke, AfkLabel = CreateMiniUI()
 local function MarkFound(source)
     local fileName = Player.Name .. ".txt"
     pcall(function() writefile(fileName, "Completed-drop") end)
-    StatusLabel.Text = "✅ ĐÃ CÓ GREEN BELT! (" .. source .. ")"
+    StatusLabel.Text = "✅ ĐÃ CÓ BLUE BELT! (" .. source .. ")"
     StatusLabel.TextColor3 = Color3.fromRGB(80, 255, 80)
     Stroke.Color = Color3.fromRGB(80, 255, 80)
     warn("[GreenBelt] Tìm thấy trong " .. source .. "! Ghi file: " .. fileName)
