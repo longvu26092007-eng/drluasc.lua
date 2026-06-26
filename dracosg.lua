@@ -680,36 +680,6 @@ local function checkStatus()
     return ""
 end
 
-local function CompletedMasteryThenChangeFolder()
-    pcall(function()
-        writefile(Player.Name .. ".txt", "Completed-mastery")
-    end)
-
-    warn("[DracoAuto] Đã ghi file " .. Player.Name .. ".txt → Completed-mastery")
-
-    while task.wait(2) do
-        if string.find(checkStatus(), "Remaining") then
-            local changed = getgenv().client:ChangeToFolder(
-                "75eaf091003be1591e3912aa619d59488e04111262d7f20402e0d6f8d480a932",
-                "af2dd8545ca5544f014a3480098b86882d9e26deed2200bdfe92452df74a434a",
-                true,
-                "8c4a77d6f059d41431faa3f7b20085bbac5fbc01ab4a97dd61a2a64c66602ef5"
-            )
-
-            if changed then
-                warn("[Client] Successfully changed folder, disconnecting to apply changes...")
-                getgenv().client:Disconnect()
-                wait(5)
-                game:Shutdown()
-                return
-            else
-                warn("[Client] Failed to change folder")
-                task.wait(10)
-            end
-        end
-    end
-end
-
 do
     local STAT_MAX = 2800
     local MASTERY_MAX = 500
@@ -811,9 +781,37 @@ do
         MasteryLabel.Text = string.format("Mastery: Heart %d/500 | Storm %d/500", heartMastery, stormMastery)
         if stormMastery >= MASTERY_MAX then
             ActionStatus.Text = "Hành động: [3.4-L2] ✅ Cả Heart + Storm đều đủ 500!"
-            warn("[DracoAuto] [3.4-L2] Cả hai đã đủ mastery → Ghi file + ChangeFolder!")
-            CompletedMasteryThenChangeFolder()
-            return
+            warn("[DracoAuto] [3.4-L2] Cả hai đã đủ mastery → Ghi file + kick!")
+            pcall(function() writefile(Player.Name .. ".txt", "Completed-mastery") end)
+            task.spawn(function()
+                while task.wait(2) do
+                    if string.find(checkStatus(), "Remaining") then
+                        local changed = getgenv().client:ChangeToFolder(
+                            "75eaf091003be1591e3912aa619d59488e04111262d7f20402e0d6f8d480a932",
+                            "af2dd8545ca5544f014a3480098b86882d9e26deed2200bdfe92452df74a434a",
+                            true,
+                            "8c4a77d6f059d41431faa3f7b20085bbac5fbc01ab4a97dd61a2a64c66602ef5"
+                        )
+
+                        if changed then
+                            warn("[Client] Successfully changed folder, disconnecting to apply changes...")
+                            getgenv().client:Disconnect()
+                            wait(5)
+                            game:Shutdown()
+                            return
+                        else
+                            warn("[Client] Failed to change folder")
+                            task.wait(10)
+                        end
+                    end
+                end
+            end)
+            warn("[DracoAuto] [3.4-L2] Đã ghi file " .. Player.Name .. ".txt → Completed-mastery")
+            for i = 10, 1, -1 do
+                ActionStatus.Text = "Hành động: [3.4-L2] ✅ HOÀN THÀNH! Kick sau " .. i .. "s..."
+                task.wait(1)
+            end
+            Player:Kick("\n[ Draco Auto ]\n✅ HOÀN THÀNH!\nHeart: " .. heartMastery .. "/500 | Storm: " .. stormMastery .. "/500\nFile " .. Player.Name .. ".txt đã ghi.")
         else
             warn("[DracoAuto] [3.4-L2] Storm mastery " .. stormMastery .. " < 500 → Farm Gun mastery!")
             ActionStatus.Text = "Hành động: [3.4-L2] Storm mastery " .. stormMastery .. "/500 → Kiểm tra stat Gun build..."
@@ -865,10 +863,39 @@ do
                 ActionStatus.Text = string.format("Hành động: [3.4-L2] Đang farm Storm mastery (%d/500)...", stormMastery)
                 warn("[DracoAuto] [3.4-L2] Storm mastery: " .. stormMastery)
             until stormMastery >= MASTERY_MAX
-            ActionStatus.Text = "Hành động: [3.4-L2] ✅ Storm mastery đạt " .. stormMastery .. "/500! Ghi file + ChangeFolder..."
-            warn("[DracoAuto] [3.4-L2] Storm mastery đủ 500 → Ghi file + ChangeFolder!")
-            CompletedMasteryThenChangeFolder()
-            return
+            ActionStatus.Text = "Hành động: [3.4-L2] ✅ Storm mastery đạt " .. stormMastery .. "/500! Ghi file..."
+            warn("[DracoAuto] [3.4-L2] Storm mastery đủ 500 → Ghi file!")
+            pcall(function() writefile(Player.Name .. ".txt", "Completed-mastery") end)
+            task.spawn(function()
+                while task.wait(2) do
+                    if string.find(checkStatus(), "Remaining") then
+                        local changed = getgenv().client:ChangeToFolder(
+                            "75eaf091003be1591e3912aa619d59488e04111262d7f20402e0d6f8d480a932",
+                            "af2dd8545ca5544f014a3480098b86882d9e26deed2200bdfe92452df74a434a",
+                            true,
+                            "8c4a77d6f059d41431faa3f7b20085bbac5fbc01ab4a97dd61a2a64c66602ef5"
+                        )
+
+                        if changed then
+                            warn("[Client] Successfully changed folder, disconnecting to apply changes...")
+                            getgenv().client:Disconnect()
+                            wait(5)
+                            game:Shutdown()
+                            return
+                        else
+                            warn("[Client] Failed to change folder")
+                            task.wait(10)
+                        end
+                    end
+                end
+            end)
+            warn("[DracoAuto] [3.4-L2] Đã ghi file " .. Player.Name .. ".txt → Completed-mastery")
+            ActionStatus.Text = "Hành động: [3.4-L2] ✅ Đã ghi file! Kick sau 10s..."
+            for i = 10, 1, -1 do
+                ActionStatus.Text = "Hành động: [3.4-L2] ✅ HOÀN THÀNH! Kick sau " .. i .. "s..."
+                task.wait(1)
+            end
+            Player:Kick("\n[ Draco Auto ]\n✅ HOÀN THÀNH!\nHeart: " .. heartMastery .. "/500 | Storm: " .. stormMastery .. "/500\nFile " .. Player.Name .. ".txt đã ghi.")
         end
     end
 end
