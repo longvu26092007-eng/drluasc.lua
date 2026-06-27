@@ -653,33 +653,6 @@ end
 -- ==========================================
 -- [ 3.4 ] FARM MASTERY DRAGONHEART & DRAGONSTORM ← GIỮ NGUYÊN
 -- ==========================================
-local rf = workspace
-    :WaitForChild("HydraIslandClient")
-    :WaitForChild("RemoteFunction")
-
-local TARGET_COMPLETE = 2
-
-local function checkStatus()
-    local ok, res = pcall(function()
-        return rf:InvokeServer("progress")
-    end)
-
-    if not ok or typeof(res) ~= "table" then
-        return ""
-    end
-
-    if res.Green == true
-        and res.Yellow == true
-        and res.Red == true
-        and res.r == true
-        and tonumber(res.complete) == TARGET_COMPLETE
-    then
-        return "Remaining"
-    end
-
-    return ""
-end
-
 do
     local STAT_MAX = 2800
     local MASTERY_MAX = 500
@@ -783,29 +756,22 @@ do
             ActionStatus.Text = "Hành động: [3.4-L2] ✅ Cả Heart + Storm đều đủ 500!"
             warn("[DracoAuto] [3.4-L2] Cả hai đã đủ mastery → Ghi file + kick!")
             pcall(function() writefile(Player.Name .. ".txt", "Completed-mastery") end)
-            task.spawn(function()
-                while task.wait(2) do
-                    if string.find(checkStatus(), "Remaining") then
-                        local changed = getgenv().client:ChangeToFolder(
-                            "75eaf091003be1591e3912aa619d59488e04111262d7f20402e0d6f8d480a932",
-                            "af2dd8545ca5544f014a3480098b86882d9e26deed2200bdfe92452df74a434a",
-                            true,
-                            "8c4a77d6f059d41431faa3f7b20085bbac5fbc01ab4a97dd61a2a64c66602ef5"
-                        )
+            local changed = getgenv().client:ChangeToFolder(
+                "75eaf091003be1591e3912aa619d59488e04111262d7f20402e0d6f8d480a932",
+                "af2dd8545ca5544f014a3480098b86882d9e26deed2200bdfe92452df74a434a",
+                true,
+                "8c4a77d6f059d41431faa3f7b20085bbac5fbc01ab4a97dd61a2a64c66602ef5"
+            )
 
-                        if changed then
-                            warn("[Client] Successfully changed folder, disconnecting to apply changes...")
-                            getgenv().client:Disconnect()
-                            wait(5)
-                            game:Shutdown()
-                            return
-                        else
-                            warn("[Client] Failed to change folder")
-                            task.wait(10)
-                        end
-                    end
-                end
-            end)
+            if changed then
+                warn("[Client] Successfully changed folder, disconnecting to apply changes...")
+                getgenv().client:Disconnect()
+                wait(5)
+                game:Shutdown()
+            else
+                warn("[Client] Failed to change folder")
+                task.wait(10)
+            end
             warn("[DracoAuto] [3.4-L2] Đã ghi file " .. Player.Name .. ".txt → Completed-mastery")
             for i = 10, 1, -1 do
                 ActionStatus.Text = "Hành động: [3.4-L2] ✅ HOÀN THÀNH! Kick sau " .. i .. "s..."
@@ -866,29 +832,22 @@ do
             ActionStatus.Text = "Hành động: [3.4-L2] ✅ Storm mastery đạt " .. stormMastery .. "/500! Ghi file..."
             warn("[DracoAuto] [3.4-L2] Storm mastery đủ 500 → Ghi file!")
             pcall(function() writefile(Player.Name .. ".txt", "Completed-mastery") end)
-            task.spawn(function()
-                while task.wait(2) do
-                    if string.find(checkStatus(), "Remaining") then
-                        local changed = getgenv().client:ChangeToFolder(
-                            "75eaf091003be1591e3912aa619d59488e04111262d7f20402e0d6f8d480a932",
-                            "af2dd8545ca5544f014a3480098b86882d9e26deed2200bdfe92452df74a434a",
-                            true,
-                            "8c4a77d6f059d41431faa3f7b20085bbac5fbc01ab4a97dd61a2a64c66602ef5"
-                        )
+            local changed = getgenv().client:ChangeToFolder(
+                "75eaf091003be1591e3912aa619d59488e04111262d7f20402e0d6f8d480a932",
+                "af2dd8545ca5544f014a3480098b86882d9e26deed2200bdfe92452df74a434a",
+                true,
+                "8c4a77d6f059d41431faa3f7b20085bbac5fbc01ab4a97dd61a2a64c66602ef5"
+            )
 
-                        if changed then
-                            warn("[Client] Successfully changed folder, disconnecting to apply changes...")
-                            getgenv().client:Disconnect()
-                            wait(5)
-                            game:Shutdown()
-                            return
-                        else
-                            warn("[Client] Failed to change folder")
-                            task.wait(10)
-                        end
-                    end
-                end
-            end)
+            if changed then
+                warn("[Client] Successfully changed folder, disconnecting to apply changes...")
+                getgenv().client:Disconnect()
+                wait(5)
+                game:Shutdown()
+            else
+                warn("[Client] Failed to change folder")
+                task.wait(10)
+            end
             warn("[DracoAuto] [3.4-L2] Đã ghi file " .. Player.Name .. ".txt → Completed-mastery")
             ActionStatus.Text = "Hành động: [3.4-L2] ✅ Đã ghi file! Kick sau 10s..."
             for i = 10, 1, -1 do
