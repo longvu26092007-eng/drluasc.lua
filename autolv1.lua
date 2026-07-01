@@ -384,6 +384,58 @@ task.spawn(function()
 
                             StatusLabel.Text = "✅ Completed-heart!\n📄 " .. Player.Name .. ".txt"
                             StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+
+                            -- ========================================
+                            -- CHANGE TO FOLDER SAU KHI CO HEART
+                            -- ========================================
+                            if getgenv().change == true and getgenv().client then
+                                local changeDone = false
+                                local changeLock = getgenv()._changeToFolderLock or false
+
+                                if not changeLock then
+                                    getgenv()._changeToFolderLock = true
+                                    warn("[Levi] ChangeToFolder enabled, bắt đầu đổi folder...")
+
+                                    task.spawn(function()
+                                        local function safeNil(val)
+                                            if val == nil or val == "" or val == "........." or val == "nil" then
+                                                return nil
+                                            end
+                                            return val
+                                        end
+
+                                        local fid1 = safeNil(getgenv().id1)
+                                        local fid2 = safeNil(getgenv().id2)
+                                        local fid3 = safeNil(getgenv().id3)
+
+                                        warn("[Levi] ChangeToFolder: id1=" .. tostring(fid1) .. " id2=" .. tostring(fid2) .. " id3=" .. tostring(fid3))
+
+                                        local ok, err = pcall(function()
+                                            if fid3 then
+                                                getgenv().client:ChangeToFolder(fid1, fid2, true, fid3)
+                                            else
+                                                getgenv().client:ChangeToFolder(fid1, fid2, true)
+                                            end
+                                        end)
+
+                                        if ok then
+                                            warn("[Levi] ChangeToFolder thành công!")
+                                            StatusLabel.Text = "✅ Completed-heart!\n📁 Folder đổi thành công"
+                                            StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+
+                                            task.wait(5)
+                                            warn("[Levi] Shutdown game...")
+                                            game:Shutdown()
+                                        else
+                                            warn("[Levi] ChangeToFolder lỗi: " .. tostring(err))
+                                            getgenv()._changeToFolderLock = false
+                                        end
+                                    end)
+                                end
+                            else
+                                warn("[Levi] getgenv().change không phải true hoặc client không tồn tại, bỏ qua ChangeToFolder")
+                            end
+
                             break
                         end
                     end
