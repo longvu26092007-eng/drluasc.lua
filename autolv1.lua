@@ -211,6 +211,91 @@ local function IsOwner(name)
 end
 
 -- ==========================================
+-- [ CHANGE FOLDER — chuẩn hoá theo KaitunV4 ]
+--   Config ngoài loader:
+--     getgenv().ChangeFolderOnCompleted = true|false
+--     getgenv().id1 = "..."   (bắt buộc)
+--     getgenv().id2 = "..."   (bắt buộc)
+--     getgenv().id3 = "..." | "........." | "nil" | nil   (optional)
+-- ==========================================
+local DESKTOP_DIR = "C:\\Users\\Administrator\\Desktop\\"
+
+local _ChangeFolderLock          = false
+local _LastChangeFolderFailAt    = 0
+local _ChangeFolderRetryCooldown = 10
+
+-- id optional: bỏ trống / "........." / chuỗi toàn dấu chấm / "nil" → trả về nil THẬT
+local function NormalizeFolderId(value)
+    if value == nil then return nil, false end
+    local s = tostring(value)
+    s = s:gsub("^%s+", ""):gsub("%s+$", "")
+    if s == "" or s == "........." or s:match("^%.+$") then return nil, false end
+    if s:lower() == "nil" then return nil, false end
+    return s, true
+end
+
+local function DoChangeFolder(reason)
+    if not getgenv().ChangeFolderOnCompleted then return false end
+    if _ChangeFolderLock then return false end
+    if _LastChangeFolderFailAt > 0
+        and (tick() - _LastChangeFolderFailAt) < _ChangeFolderRetryCooldown then
+        return false
+    end
+
+    local client = getgenv().client
+    if type(client) ~= "table" and type(client) ~= "userdata" then
+        warn("[Levi][ChangeFolder] getgenv().client không tồn tại")
+        _LastChangeFolderFailAt = tick()
+        return false
+    end
+    if type(client.ChangeToFolder) ~= "function" then
+        warn("[Levi][ChangeFolder] client:ChangeToFolder không tồn tại")
+        _LastChangeFolderFailAt = tick()
+        return false
+    end
+
+    local id1, ok1 = NormalizeFolderId(getgenv().id1)
+    local id2, ok2 = NormalizeFolderId(getgenv().id2)
+    local id3      = NormalizeFolderId(getgenv().id3)
+
+    if not ok1 or not ok2 then
+        warn("[Levi][ChangeFolder] Thiếu id1/id2, không gọi ChangeToFolder")
+        _LastChangeFolderFailAt = tick()
+        return false
+    end
+
+    _ChangeFolderLock = true
+    warn("[Levi][ChangeFolder] Completed -> ChangeToFolder | reason=" .. tostring(reason)
+        .. " | id1=" .. tostring(id1) .. " id2=" .. tostring(id2) .. " id3=" .. tostring(id3))
+
+    local ok, ret = pcall(function()
+        return client:ChangeToFolder(id1, id2, true, id3)
+    end)
+
+    if not ok then
+        warn("[Levi][ChangeFolder] Lỗi khi gọi ChangeToFolder: " .. tostring(ret))
+        _ChangeFolderLock = false
+        _LastChangeFolderFailAt = tick()
+        return false
+    end
+
+    if ret then
+        warn("[Levi][ChangeFolder] Đổi folder thành công -> Disconnect + Shutdown")
+        pcall(function()
+            if type(client.Disconnect) == "function" then client:Disconnect() end
+        end)
+        task.wait(5)
+        pcall(function() game:Shutdown() end)
+        return true
+    else
+        warn("[Levi][ChangeFolder] Đổi folder thất bại, retry sau " .. _ChangeFolderRetryCooldown .. "s")
+        _ChangeFolderLock = false
+        _LastChangeFolderFailAt = tick()
+        return false
+    end
+end
+
+-- ==========================================
 -- LOGIC: WAIT 15S → SEA 3 → BUY DRAGON TALON → DETECT OWNER
 -- ==========================================
 task.spawn(function()
@@ -374,66 +459,37 @@ task.spawn(function()
                             StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
                             warn("[Levi] Phát hiện Leviathan Heart x" .. heartCount .. "! Ghi file...")
 
-                            pcall(function()
-                                writefile(Player.Name .. ".txt", "Completed-heart")
+                            local heartFile = DESKTOP_DIR .. Player.Name .. ".txt"
+                            local wok, werr = pcall(function()
+                                writefile(heartFile, "Completed-heart")
                             end)
-                            warn("[Levi] Đã ghi file: " .. Player.Name .. ".txt → Completed-heart")
+                            if wok then
+                                warn("[Levi] Đã ghi file: " .. heartFile .. " → Completed-heart")
+                            else
+                                warn("[Levi] Ghi Desktop lỗi (" .. tostring(werr) .. "), fallback workspace...")
+                                pcall(function() writefile(Player.Name .. ".txt", "Completed-heart") end)
+                                heartFile = Player.Name .. ".txt"
+                            end
 
                             getgenv().CustomChange = true
                             warn("[Levi] Đã set getgenv().CustomChange = true")
 
-                            StatusLabel.Text = "✅ Completed-heart!\n📄 " .. Player.Name .. ".txt"
+                            StatusLabel.Text = "✅ Completed-heart!\n📄 " .. heartFile
                             StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
 
                             -- ========================================
-                            -- CHANGE TO FOLDER SAU KHI CO HEART
+                            -- CHANGE TO FOLDER SAU KHI CÓ HEART (chuẩn KaitunV4)
                             -- ========================================
-                            if getgenv().change == true and getgenv().client then
-                                local changeDone = false
-                                local changeLock = getgenv()._changeToFolderLock or false
-
-                                if not changeLock then
-                                    getgenv()._changeToFolderLock = true
-                                    warn("[Levi] ChangeToFolder enabled, bắt đầu đổi folder...")
-
-                                    task.spawn(function()
-                                        local function safeNil(val)
-                                            if val == nil or val == "" or val == "........." or val == "nil" then
-                                                return nil
-                                            end
-                                            return val
-                                        end
-
-                                        local fid1 = safeNil(getgenv().id1)
-                                        local fid2 = safeNil(getgenv().id2)
-                                        local fid3 = safeNil(getgenv().id3)
-
-                                        warn("[Levi] ChangeToFolder: id1=" .. tostring(fid1) .. " id2=" .. tostring(fid2) .. " id3=" .. tostring(fid3))
-
-                                        local ok, err = pcall(function()
-                                            if fid3 then
-                                                getgenv().client:ChangeToFolder(fid1, fid2, true, fid3)
-                                            else
-                                                getgenv().client:ChangeToFolder(fid1, fid2, true)
-                                            end
-                                        end)
-
-                                        if ok then
-                                            warn("[Levi] ChangeToFolder thành công!")
-                                            StatusLabel.Text = "✅ Completed-heart!\n📁 Folder đổi thành công"
-                                            StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-
-                                            task.wait(5)
-                                            warn("[Levi] Shutdown game...")
-                                            game:Shutdown()
-                                        else
-                                            warn("[Levi] ChangeToFolder lỗi: " .. tostring(err))
-                                            getgenv()._changeToFolderLock = false
-                                        end
-                                    end)
-                                end
+                            if getgenv().ChangeFolderOnCompleted then
+                                task.spawn(function()
+                                    local done = DoChangeFolder("Completed-heart")
+                                    if done then
+                                        StatusLabel.Text = "✅ Completed-heart!\n📁 Folder đổi thành công"
+                                        StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+                                    end
+                                end)
                             else
-                                warn("[Levi] getgenv().change không phải true hoặc client không tồn tại, bỏ qua ChangeToFolder")
+                                warn("[Levi] ChangeFolderOnCompleted != true → bỏ qua ChangeToFolder")
                             end
 
                             break
