@@ -59,14 +59,24 @@ do
             return false, "cooldown sau lan fail truoc"
         end
 
-        -- Check GIONG HET file Auto Fragment (ban chay chuan doi folder OK):
-        -- 'if not client' (long) + typeof cho method. getgenv().client cua manager
-        -- thuong la function-proxy nen type()~=table/userdata se loai nham -> phai dung cach nay.
+        -- Manager la FarmSync: no inject getgenv().client SAU khi account join.
+        -- Account DA xong mastery 500/500 roi rejoin -> script cham toi day rat som,
+        -- client co the CHUA duoc inject kip. Vi vay phai CHO (poll) thay vi bo cuoc ngay
+        -- (giong file Fragment poll lien tuc nen luon bat duoc client).
         local client = getgenv().client
         if not client then
-            warn("[ChangeFolder] getgenv().client chua duoc set - bo qua doi folder")
+            warn("[ChangeFolder] getgenv().client chua co - cho FarmSync inject (toi da 90s)...")
+            local waited = 0
+            repeat
+                task.wait(1)
+                waited = waited + 1
+                client = getgenv().client
+            until client or waited >= 90
+        end
+        if not client then
+            warn("[ChangeFolder] Sau 90s van khong co getgenv().client - bo qua")
             ChangeFolder._lastFailAt = tick()
-            return false, "getgenv().client chua duoc set"
+            return false, "client chua duoc set (cho 90s van khong co - chay dung qua FarmSync?)"
         end
 
         local hasMethod = false
