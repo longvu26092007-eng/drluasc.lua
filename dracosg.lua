@@ -12,6 +12,121 @@ if not NhapKey or NhapKey == "" then
 end
 warn("[DracoAuto] ✅ Key nhận được: " .. string.sub(NhapKey, 1, 6) .. "***")
 -- ==========================================
+-- [ CHANGE FOLDER ON COMPLETED MASTERY ]
+-- ==========================================
+local ChangeFolder = {}
+do
+    ChangeFolder._lock = false
+    ChangeFolder._lastFailAt = 0
+    ChangeFolder._retryCooldown = 10
+
+    local function NormalizeFolderId(value, allowNil)
+        if value == nil then
+            return nil, false
+        end
+
+        local s = tostring(value)
+        s = s:gsub("^%s+", ""):gsub("%s+$", "")
+
+        if s == "" or s == "........." or s:match("^%.+$") then
+            return nil, false
+        end
+
+        local lower = s:lower()
+        if lower == "nil" or lower == "null" then
+            return nil, false
+        end
+
+        return s, true
+    end
+
+    function ChangeFolder.Run(reason)
+        if getgenv().ChangeFolderOnCompleted ~= true then
+            warn("[ChangeFolder] ChangeFolderOnCompleted=false, skip")
+            return false
+        end
+
+        if ChangeFolder._lock then
+            warn("[ChangeFolder] đang chạy, skip")
+            return false
+        end
+
+        if ChangeFolder._lastFailAt > 0
+            and (tick() - ChangeFolder._lastFailAt) < ChangeFolder._retryCooldown then
+            warn("[ChangeFolder] cooldown fail, skip")
+            return false
+        end
+
+        local client = getgenv().client
+        if type(client) ~= "table" and type(client) ~= "userdata" then
+            warn("[ChangeFolder] getgenv().client không tồn tại")
+            ChangeFolder._lastFailAt = tick()
+            return false
+        end
+
+        if type(client.ChangeToFolder) ~= "function" then
+            warn("[ChangeFolder] client:ChangeToFolder không tồn tại")
+            ChangeFolder._lastFailAt = tick()
+            return false
+        end
+
+        local id1, ok1 = NormalizeFolderId(getgenv().id1, false)
+        local id2, ok2 = NormalizeFolderId(getgenv().id2, false)
+        local id3, ok3 = NormalizeFolderId(getgenv().id3, true)
+
+        if not ok1 or not ok2 then
+            warn("[ChangeFolder] Thiếu id1/id2, không gọi ChangeToFolder")
+            ChangeFolder._lastFailAt = tick()
+            return false
+        end
+
+        if not ok3 then
+            id3 = nil
+        end
+
+        ChangeFolder._lock = true
+
+        warn("[ChangeFolder] Completed mastery -> gọi ChangeToFolder, reason=" .. tostring(reason))
+
+        local ok, ret = pcall(function()
+            return client:ChangeToFolder(id1, id2, true, id3)
+        end)
+
+        if not ok then
+            warn("[ChangeFolder] Lỗi khi gọi ChangeToFolder: " .. tostring(ret))
+            ChangeFolder._lock = false
+            ChangeFolder._lastFailAt = tick()
+            return false
+        end
+
+        local changed = ret and true or false
+
+        if changed then
+            warn("[ChangeFolder] Successfully changed folder, disconnecting to apply changes...")
+
+            pcall(function()
+                if getgenv().client and type(getgenv().client.Disconnect) == "function" then
+                    getgenv().client:Disconnect()
+                end
+            end)
+
+            task.wait(5)
+
+            pcall(function()
+                game:Shutdown()
+            end)
+
+            return true
+        else
+            warn("[ChangeFolder] Failed to change folder")
+            ChangeFolder._lock = false
+            ChangeFolder._lastFailAt = tick()
+            task.wait(10)
+            return false
+        end
+    end
+end
+-- ==========================================
 -- [ PHẦN 0 : CHỌN TEAM & ĐỢI GAME LOAD ] ← ĐÃ SỬA SẠCH
 -- ==========================================
 getgenv().Team = getgenv().Team or "Marines"
@@ -756,21 +871,10 @@ do
             ActionStatus.Text = "Hành động: [3.4-L2] ✅ Cả Heart + Storm đều đủ 500!"
             warn("[DracoAuto] [3.4-L2] Cả hai đã đủ mastery → Ghi file + kick!")
             pcall(function() writefile(Player.Name .. ".txt", "Completed-mastery") end)
-            local changed = getgenv().client:ChangeToFolder(
-                "75eaf091003be1591e3912aa619d59488e04111262d7f20402e0d6f8d480a932",
-                "af2dd8545ca5544f014a3480098b86882d9e26deed2200bdfe92452df74a434a",
-                true,
-                "8c4a77d6f059d41431faa3f7b20085bbac5fbc01ab4a97dd61a2a64c66602ef5"
-            )
+            local changed = ChangeFolder.Run("Completed-mastery")
 
             if changed then
-                warn("[Client] Successfully changed folder, disconnecting to apply changes...")
-                getgenv().client:Disconnect()
-                wait(5)
-                game:Shutdown()
-            else
-                warn("[Client] Failed to change folder")
-                task.wait(10)
+                return
             end
             warn("[DracoAuto] [3.4-L2] Đã ghi file " .. Player.Name .. ".txt → Completed-mastery")
             for i = 10, 1, -1 do
@@ -832,21 +936,10 @@ do
             ActionStatus.Text = "Hành động: [3.4-L2] ✅ Storm mastery đạt " .. stormMastery .. "/500! Ghi file..."
             warn("[DracoAuto] [3.4-L2] Storm mastery đủ 500 → Ghi file!")
             pcall(function() writefile(Player.Name .. ".txt", "Completed-mastery") end)
-            local changed = getgenv().client:ChangeToFolder(
-                "75eaf091003be1591e3912aa619d59488e04111262d7f20402e0d6f8d480a932",
-                "af2dd8545ca5544f014a3480098b86882d9e26deed2200bdfe92452df74a434a",
-                true,
-                "8c4a77d6f059d41431faa3f7b20085bbac5fbc01ab4a97dd61a2a64c66602ef5"
-            )
+            local changed = ChangeFolder.Run("Completed-mastery")
 
             if changed then
-                warn("[Client] Successfully changed folder, disconnecting to apply changes...")
-                getgenv().client:Disconnect()
-                wait(5)
-                game:Shutdown()
-            else
-                warn("[Client] Failed to change folder")
-                task.wait(10)
+                return
             end
             warn("[DracoAuto] [3.4-L2] Đã ghi file " .. Player.Name .. ".txt → Completed-mastery")
             ActionStatus.Text = "Hành động: [3.4-L2] ✅ Đã ghi file! Kick sau 10s..."
