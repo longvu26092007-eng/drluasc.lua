@@ -40,34 +40,43 @@ do
         return s, true
     end
 
+    -- Tra ve: (changed, reason). changed=true khi doi folder thanh cong.
+    -- reason la chuoi giai thich vi sao KHONG doi duoc (de hien len UI/console).
     function ChangeFolder.Run(reason)
         if getgenv().ChangeFolderOnCompleted ~= true then
-            warn("[ChangeFolder] ChangeFolderOnCompleted=false, skip")
-            return false
+            warn("[ChangeFolder] ChangeFolderOnCompleted != true, skip")
+            return false, "ChangeFolderOnCompleted != true"
         end
 
         if ChangeFolder._lock then
             warn("[ChangeFolder] đang chạy, skip")
-            return false
+            return false, "dang chay (lock)"
         end
 
         if ChangeFolder._lastFailAt > 0
             and (tick() - ChangeFolder._lastFailAt) < ChangeFolder._retryCooldown then
             warn("[ChangeFolder] cooldown fail, skip")
-            return false
+            return false, "cooldown sau lan fail truoc"
         end
 
+        -- Check GIONG HET file Auto Fragment (ban chay chuan doi folder OK):
+        -- 'if not client' (long) + typeof cho method. getgenv().client cua manager
+        -- thuong la function-proxy nen type()~=table/userdata se loai nham -> phai dung cach nay.
         local client = getgenv().client
-        if type(client) ~= "table" and type(client) ~= "userdata" then
-            warn("[ChangeFolder] getgenv().client không tồn tại")
+        if not client then
+            warn("[ChangeFolder] getgenv().client chua duoc set - bo qua doi folder")
             ChangeFolder._lastFailAt = tick()
-            return false
+            return false, "getgenv().client chua duoc set"
         end
 
-        if type(client.ChangeToFolder) ~= "function" then
-            warn("[ChangeFolder] client:ChangeToFolder không tồn tại")
+        local hasMethod = false
+        pcall(function()
+            hasMethod = typeof(client.ChangeToFolder) == "function"
+        end)
+        if not hasMethod then
+            warn("[ChangeFolder] client.ChangeToFolder khong ton tai - bo qua doi folder")
             ChangeFolder._lastFailAt = tick()
-            return false
+            return false, "client.ChangeToFolder khong ton tai"
         end
 
         local id1, ok1 = NormalizeFolderId(getgenv().id1, false)
@@ -75,9 +84,9 @@ do
         local id3, ok3 = NormalizeFolderId(getgenv().id3, true)
 
         if not ok1 or not ok2 then
-            warn("[ChangeFolder] Thiếu id1/id2, không gọi ChangeToFolder")
+            warn("[ChangeFolder] Thieu id1/id2, khong goi ChangeToFolder")
             ChangeFolder._lastFailAt = tick()
-            return false
+            return false, "thieu id1/id2"
         end
 
         if not ok3 then
@@ -86,17 +95,17 @@ do
 
         ChangeFolder._lock = true
 
-        warn("[ChangeFolder] Completed mastery -> gọi ChangeToFolder, reason=" .. tostring(reason))
+        warn("[ChangeFolder] Completed mastery -> goi ChangeToFolder, reason=" .. tostring(reason))
 
         local ok, ret = pcall(function()
             return client:ChangeToFolder(id1, id2, true, id3)
         end)
 
         if not ok then
-            warn("[ChangeFolder] Lỗi khi gọi ChangeToFolder: " .. tostring(ret))
+            warn("[ChangeFolder] Loi khi goi ChangeToFolder: " .. tostring(ret))
             ChangeFolder._lock = false
             ChangeFolder._lastFailAt = tick()
-            return false
+            return false, "loi goi ChangeToFolder: " .. tostring(ret)
         end
 
         local changed = ret and true or false
@@ -105,9 +114,7 @@ do
             warn("[ChangeFolder] Successfully changed folder, disconnecting to apply changes...")
 
             pcall(function()
-                if getgenv().client and type(getgenv().client.Disconnect) == "function" then
-                    getgenv().client:Disconnect()
-                end
+                client:Disconnect()
             end)
 
             task.wait(5)
@@ -116,13 +123,12 @@ do
                 game:Shutdown()
             end)
 
-            return true
+            return true, "ok"
         else
-            warn("[ChangeFolder] Failed to change folder")
+            warn("[ChangeFolder] ChangeToFolder tra ve false/nil (ret=" .. tostring(ret) .. ")")
             ChangeFolder._lock = false
             ChangeFolder._lastFailAt = tick()
-            task.wait(10)
-            return false
+            return false, "ChangeToFolder tra ve false/nil (ret=" .. tostring(ret) .. ")"
         end
     end
 end
@@ -871,10 +877,20 @@ do
             ActionStatus.Text = "Hành động: [3.4-L2] ✅ Cả Heart + Storm đều đủ 500!"
             warn("[DracoAuto] [3.4-L2] Cả hai đã đủ mastery → Ghi file + kick!")
             pcall(function() writefile(Player.Name .. ".txt", "Completed-mastery") end)
-            local changed = ChangeFolder.Run("Completed-mastery")
+            local changed, cfReason = ChangeFolder.Run("Completed-mastery")
 
             if changed then
                 return
+            end
+
+            -- Bat doi folder nhung KHONG doi duoc -> hien ro ly do len UI + console
+            -- (thuong la getgenv().client chua co, hoac ChangeToFolder tra ve false/nil).
+            if getgenv().ChangeFolderOnCompleted == true then
+                warn("[ChangeFolder] KHONG doi duoc folder. Ly do: " .. tostring(cfReason))
+                for _i = 8, 1, -1 do
+                    ActionStatus.Text = "⚠ ChangeFolder FAIL: " .. tostring(cfReason) .. " (kick sau " .. _i .. "s)"
+                    task.wait(1)
+                end
             end
             warn("[DracoAuto] [3.4-L2] Đã ghi file " .. Player.Name .. ".txt → Completed-mastery")
             for i = 10, 1, -1 do
@@ -936,10 +952,20 @@ do
             ActionStatus.Text = "Hành động: [3.4-L2] ✅ Storm mastery đạt " .. stormMastery .. "/500! Ghi file..."
             warn("[DracoAuto] [3.4-L2] Storm mastery đủ 500 → Ghi file!")
             pcall(function() writefile(Player.Name .. ".txt", "Completed-mastery") end)
-            local changed = ChangeFolder.Run("Completed-mastery")
+            local changed, cfReason = ChangeFolder.Run("Completed-mastery")
 
             if changed then
                 return
+            end
+
+            -- Bat doi folder nhung KHONG doi duoc -> hien ro ly do len UI + console
+            -- (thuong la getgenv().client chua co, hoac ChangeToFolder tra ve false/nil).
+            if getgenv().ChangeFolderOnCompleted == true then
+                warn("[ChangeFolder] KHONG doi duoc folder. Ly do: " .. tostring(cfReason))
+                for _i = 8, 1, -1 do
+                    ActionStatus.Text = "⚠ ChangeFolder FAIL: " .. tostring(cfReason) .. " (kick sau " .. _i .. "s)"
+                    task.wait(1)
+                end
             end
             warn("[DracoAuto] [3.4-L2] Đã ghi file " .. Player.Name .. ".txt → Completed-mastery")
             ActionStatus.Text = "Hành động: [3.4-L2] ✅ Đã ghi file! Kick sau 10s..."
