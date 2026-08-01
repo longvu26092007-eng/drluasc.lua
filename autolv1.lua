@@ -70,6 +70,143 @@ local SEA_1 = {["2753915549"] = true, ["85211729168715"] = true}
 local SEA_2 = {["4442272183"] = true, ["79091703265657"] = true}
 local SEA_3 = {["7449423635"] = true, ["100117331123089"] = true}
 
+
+-- ==========================================
+-- [ MATERIAL TRACKER — LEVIATHAN HEART ]
+-- Đọc Material bằng Inventory + ItemReplicationService.
+-- Chạy nền để không chặn luồng Team / Sea / Dragon Talon / Owner.
+-- ==========================================
+local MaterialTracker = {
+    Ready = false,
+    Counts = {},
+    NamesById = {},
+    CategoriesById = {},
+    LastError = nil,
+}
+
+local function NormalizeMaterialName(value)
+    return tostring(value or "")
+        :lower()
+        :gsub("[^%w]", "")
+end
+
+local function GetMaterialCount(materialName)
+    return tonumber(MaterialTracker.Counts[NormalizeMaterialName(materialName)]) or 0
+end
+
+task.spawn(function()
+    local okRequire, Inventory, ItemConfig, ItemService, KEYS = pcall(function()
+        local RS = services.ReplicatedStorage
+        return
+            require(RS.Controllers.UI.Inventory),
+            require(RS.ItemConfig),
+            require(RS.ItemReplicationService),
+            require(RS.ItemReplicationService.KEYS)
+    end)
+
+    if not okRequire then
+        MaterialTracker.LastError = tostring(Inventory)
+        warn("[Levi][Material] Không load được Inventory module: " .. tostring(Inventory))
+        return
+    end
+
+    local function InventoryInitialized()
+        local ok, ready = pcall(function()
+            return Inventory:GetIfInitialized()
+        end)
+        return ok and ready == true and ItemService.IsInitialized == true
+    end
+
+    -- Không khóa script chính. Chờ tối đa 30s rồi vẫn tiếp tục retry refresh nền.
+    local inventoryDeadline = os.clock() + 30
+    repeat task.wait(0.2)
+    until InventoryInitialized() or os.clock() >= inventoryDeadline
+
+    if not InventoryInitialized() then
+        warn("[Levi][Material] Inventory chưa initialized sau 30s; tiếp tục retry nền")
+    end
+
+    local function ResolveItemInfo(itemId)
+        if itemId == nil then return nil, nil end
+
+        if MaterialTracker.NamesById[itemId] ~= nil then
+            return MaterialTracker.NamesById[itemId], MaterialTracker.CategoriesById[itemId]
+        end
+
+        local successConfig, config = pcall(function()
+            return ItemConfig.match(itemId):unwrap()
+        end)
+
+        if not successConfig or not config then
+            return nil, nil
+        end
+
+        local display = config.Display or {}
+        local index = config.Index or {}
+        local name = display.Name or index.StorageKey or tostring(itemId)
+        local category = display.Category
+
+        MaterialTracker.NamesById[itemId] = name
+        MaterialTracker.CategoriesById[itemId] = category
+        return name, category
+    end
+
+    while true do
+        local successRefresh, refreshError = pcall(function()
+            local amounts = {}
+
+            for _, item in pairs(ItemService:GetItems(KEYS.QUANTITY) or {}) do
+                if type(item) == "table" and item.ItemId ~= nil then
+                    amounts[item.ItemId] =
+                        (amounts[item.ItemId] or 0)
+                        + (tonumber(item.Value) or 0)
+                end
+            end
+
+            local checked = {}
+            local counts = {}
+
+            -- Duyệt đúng theo Inventory:GetTiles() như detector mẫu.
+            for _, tile in pairs(Inventory:GetTiles() or {}) do
+                local id = tile and tile.ItemId
+
+                if id and not checked[id] then
+                    checked[id] = true
+
+                    local name, category = ResolveItemInfo(id)
+                    local key = NormalizeMaterialName(name)
+                    if name and (category == "Material" or key == "leviathanheart") then
+                        counts[key] = amounts[id] or 1
+                    end
+                end
+            end
+
+            -- Bổ sung resolve trực tiếp các ItemId có quantity.
+            -- Tránh trường hợp quantity đã replicate nhưng tile chưa kịp xuất hiện.
+            for id, amount in pairs(amounts) do
+                if not checked[id] then
+                    local name, category = ResolveItemInfo(id)
+                    local key = NormalizeMaterialName(name)
+                    if name and (category == "Material" or key == "leviathanheart") then
+                        counts[key] = (counts[key] or 0) + amount
+                    end
+                end
+            end
+
+            MaterialTracker.Counts = counts
+            MaterialTracker.Ready = true
+            MaterialTracker.LastError = nil
+        end)
+
+        if not successRefresh then
+            MaterialTracker.LastError = tostring(refreshError)
+            warn("[Levi][Material] Refresh lỗi: " .. tostring(refreshError))
+        end
+
+        task.wait(0.5)
+    end
+end)
+
 -- ==========================================
 -- [ DRAGON TALON - CHECK & BUY ]
 -- ==========================================
@@ -425,24 +562,15 @@ task.spawn(function()
                 end)
 
                 -- ========================================
-                -- CHECK LEVIATHAN HEART (0.5s interval)
+                -- CHECK LEVIATHAN HEART MATERIAL (0.5s interval)
                 -- ========================================
                 task.spawn(function()
-                    warn("[Levi] Bắt đầu check Leviathan Heart...")
+                    warn("[Levi] Bắt đầu check Leviathan Heart bằng Material tracker...")
                     while task.wait(0.5) do
-                        local heartCount = 0
-                        pcall(function()
-                            local inv = services.CommF:InvokeServer("getInventory")
-                            if type(inv) == "table" then
-                                for _, item in ipairs(inv) do
-                                    if item.Name == "Leviathan Heart" then
-                                        heartCount = item.Count or 1
-                                        break
-                                    end
-                                end
-                            end
-                        end)
+                        local heartCount = GetMaterialCount("Leviathan Heart")
 
+                        -- Fallback Tool chỉ để bắt khoảnh khắc Heart vừa được đưa vào Backpack/Character
+                        -- trước khi ItemReplicationService refresh ở tick kế tiếp.
                         if heartCount == 0 then
                             pcall(function()
                                 local bp = Player:FindFirstChild("Backpack")
