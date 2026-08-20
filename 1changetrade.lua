@@ -163,9 +163,25 @@ local function CheckItemInCache(itemName)
     return InventoryCache[itemName] ~= nil
 end
 
--- Khởi động inventory sau 3 giây
-task.delay(3, function()
-    RefreshInventory()
+-- Auto refresh khi có thay đổi
+pcall(function()
+    local ItemService = ReplicatedStorage:FindFirstChild("ItemReplicationService")
+    if ItemService then
+        local ItemAdded = ItemService:FindFirstChild("ItemAdded")
+        local ItemRemoved = ItemService:FindFirstChild("ItemRemoved")
+
+        if ItemAdded then
+            ItemAdded.Event:Connect(function()
+                task.delay(0.5, RefreshInventory)
+            end)
+        end
+
+        if ItemRemoved then
+            ItemRemoved.Event:Connect(function()
+                task.delay(0.5, RefreshInventory)
+            end)
+        end
+    end
 end)
 
 -- ══════════════════════════════════════════════════════════════════════════
@@ -221,6 +237,9 @@ local function MarkFound(source)
 end
 
 -- ══ CHECK LOGIC MỚI ══
+local CheckAttempts = 0
+local MaxRefreshAttempts = 3
+
 local function CheckYellowBelt()
     -- CHECK 1: Character
     local chr = Player.Character
@@ -235,22 +254,32 @@ local function CheckYellowBelt()
     end
 
     -- CHECK 3: Inventory mới (ItemReplicationService)
-    StatusLabel.Text = "🔍 Đang quét Inventory..."
+    StatusLabel.Text = "🔍 Đang quét Inventory... (" .. (CheckAttempts + 1) .. ")"
     StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 
-    local ok = RefreshInventory()
+    CheckAttempts = CheckAttempts + 1
 
-    if ok then
-        if CheckItemInCache("Dojo Belt (Yellow)") then
-            return MarkFound("Inventory")
-        else
-            StatusLabel.Text = "❌ CHƯA CÓ YELLOW BELT"
-            StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    -- Chỉ refresh tối đa 3 lần mỗi vòng check
+    if CheckAttempts <= MaxRefreshAttempts then
+        local ok = RefreshInventory()
+
+        if not ok then
+            StatusLabel.Text = "⚠️ Đang load Inventory... (" .. CheckAttempts .. "/" .. MaxRefreshAttempts .. ")"
+            StatusLabel.TextColor3 = Color3.fromRGB(255, 160, 0)
+            return false
         end
-    else
-        StatusLabel.Text = "⚠️ Inventory chưa sẵn sàng, thử lại..."
-        StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-        warn("[YellowBelt] Inventory system chưa load, thử lại sau 15s")
+    end
+
+    -- Check cache
+    if CheckItemInCache("Dojo Belt (Yellow)") then
+        return MarkFound("Inventory")
+    end
+
+    -- Reset counter sau khi check xong
+    if CheckAttempts >= MaxRefreshAttempts then
+        CheckAttempts = 0
+        StatusLabel.Text = "❌ CHƯA CÓ YELLOW BELT"
+        StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
     end
 
     return false
@@ -258,6 +287,9 @@ end
 
 -- ══ MAIN LOOP ══
 warn("[YellowBelt] Game đã load — Bắt đầu check mỗi 15s.")
+
+-- Đợi thêm 5s để inventory system load
+task.wait(5)
 
 while true do
     local ok, success = pcall(CheckYellowBelt)
@@ -270,6 +302,10 @@ while true do
             end
         end)
         break
+    end
+
+    if not ok then
+        warn("[YellowBelt] Lỗi check: " .. tostring(success))
     end
 
     task.wait(15)
