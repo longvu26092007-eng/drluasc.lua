@@ -14,9 +14,30 @@ local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- ══════════════════════════════════════════════════════════════════════════
--- INVENTORY SYSTEM (ItemReplicationService) - Y HỆT PullLever + DarkFrag
+-- INVENTORY SYSTEM - COPY Y HỆT PULLLEVER (line 433-543)
 -- ══════════════════════════════════════════════════════════════════════════
 
+-- Thread identity functions từ PullLever
+local _setidentity = setthreadidentity or setidentity or set_thread_identity
+local _getidentity = getthreadidentity or getidentity or get_thread_identity
+
+local function RaiseIdentity()
+    if not _setidentity then return nil end
+    local prev
+    if _getidentity then
+        local ok, v = pcall(_getidentity)
+        if ok then prev = v end
+    end
+    pcall(_setidentity, 8)
+    return prev
+end
+
+local function RestoreIdentity(prev)
+    if not _setidentity then return end
+    pcall(_setidentity, prev or 8)
+end
+
+-- Require modules (PullLever không raise identity ở đây)
 local Inventory = require(ReplicatedStorage.Controllers.UI.Inventory)
 local ItemConfig = require(ReplicatedStorage.ItemConfig)
 local ItemService = require(ReplicatedStorage.ItemReplicationService)
@@ -32,7 +53,7 @@ end
 
 -- Check item có trong inventory không
 local function HasItemInInventory(itemName)
-    -- Đợi initialized (timeout 30s như 2 file ĐÚNG)
+    -- Đợi initialized (timeout 30s)
     local deadline = os.clock() + 30
     repeat
         task.wait(0.2)
@@ -43,37 +64,44 @@ local function HasItemInInventory(itemName)
         return false
     end
 
-    -- Lấy amounts
-    local Amounts = {}
-    for _, item in pairs(ItemService:GetItems(KEYS.QUANTITY) or {}) do
-        Amounts[item.ItemId] = (Amounts[item.ItemId] or 0) + (tonumber(item.Value) or 0)
-    end
+    -- WRAP TOÀN BỘ đọc inventory bằng RaiseIdentity (như PullLever line 633-640)
+    local prev = RaiseIdentity()
 
-    -- Check tiles
-    local Checked = {}
-    for _, tile in pairs(Inventory:GetTiles() or {}) do
-        local id = tile.ItemId
+    local found = false
+    pcall(function()
+        -- Lấy amounts
+        local Amounts = {}
+        for _, item in pairs(ItemService:GetItems(KEYS.QUANTITY) or {}) do
+            Amounts[item.ItemId] = (Amounts[item.ItemId] or 0) + (tonumber(item.Value) or 0)
+        end
 
-        if id and not Checked[id] then
-            Checked[id] = true
+        -- Check tiles
+        local Checked = {}
+        for _, tile in pairs(Inventory:GetTiles() or {}) do
+            local id = tile.ItemId
 
-            local success, config = pcall(function()
-                return ItemConfig.match(id):unwrap()
-            end)
+            if id and not Checked[id] then
+                Checked[id] = true
 
-            if success and config and config.Display then
-                local name = config.Display.Name
-                    or config.Index.StorageKey
-                    or tostring(id)
+                local success, config = pcall(function()
+                    return ItemConfig.match(id):unwrap()
+                end)
 
-                if name == itemName then
-                    return true -- TÌM THẤY!
+                if success and config and config.Display then
+                    local name = config.Display.Name
+                        or config.Index.StorageKey
+                        or tostring(id)
+
+                    if name == itemName then
+                        found = true
+                    end
                 end
             end
         end
-    end
+    end)
 
-    return false -- Không tìm thấy
+    RestoreIdentity(prev)
+    return found
 end
 
 -- ══════════════════════════════════════════════════════════════════════════
