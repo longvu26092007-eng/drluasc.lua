@@ -14,7 +14,7 @@ local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- ══════════════════════════════════════════════════════════════════════════
--- INVENTORY SYSTEM (ItemReplicationService) - ĐƠN GIẢN
+-- INVENTORY SYSTEM (ItemReplicationService) - Y HỆT PullLever + DarkFrag
 -- ══════════════════════════════════════════════════════════════════════════
 
 local Inventory = require(ReplicatedStorage.Controllers.UI.Inventory)
@@ -22,18 +22,26 @@ local ItemConfig = require(ReplicatedStorage.ItemConfig)
 local ItemService = require(ReplicatedStorage.ItemReplicationService)
 local KEYS = require(ReplicatedStorage.ItemReplicationService.KEYS)
 
+-- Check initialized (copy từ 2 file ĐÚNG)
+local function inventoryInitialized()
+    local ok, ready = pcall(function()
+        return Inventory:GetIfInitialized()
+    end)
+    return ok and ready and ItemService.IsInitialized == true
+end
+
 -- Check item có trong inventory không
 local function HasItemInInventory(itemName)
-    -- Đợi initialized
-    local attempts = 0
+    -- Đợi initialized (timeout 30s như 2 file ĐÚNG)
+    local deadline = os.clock() + 30
     repeat
         task.wait(0.2)
-        attempts = attempts + 1
-        if attempts > 50 then -- timeout 10s
-            warn("[YellowBelt] Timeout waiting for Inventory")
-            return false
-        end
-    until Inventory:GetIfInitialized() and ItemService.IsInitialized == true
+    until inventoryInitialized() or os.clock() >= deadline
+
+    if not inventoryInitialized() then
+        warn("[YellowBelt] Timeout waiting for Inventory (30s)")
+        return false
+    end
 
     -- Lấy amounts
     local Amounts = {}
