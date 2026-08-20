@@ -12,177 +12,61 @@ repeat task.wait() until game.Players.LocalPlayer.Character
 local Player = game.Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local CommF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
 
 -- ══════════════════════════════════════════════════════════════════════════
--- INVENTORY SYSTEM MỚI (ItemReplicationService)
+-- INVENTORY SYSTEM (ItemReplicationService) - ĐƠN GIẢN
 -- ══════════════════════════════════════════════════════════════════════════
 
-local InvModules = {
-    Inventory = nil,
-    ItemConfig = nil,
-    ItemService = nil,
-    KEYS = nil,
-    Ready = false
-}
+local Inventory = require(ReplicatedStorage.Controllers.UI.Inventory)
+local ItemConfig = require(ReplicatedStorage.ItemConfig)
+local ItemService = require(ReplicatedStorage.ItemReplicationService)
+local KEYS = require(ReplicatedStorage.ItemReplicationService.KEYS)
 
-local InventoryCache = {}
-
--- Thread Identity Protection
-local function RaiseIdentity(level)
-    local fn = setthreadidentity or setidentity or set_thread_identity
-    if fn then pcall(fn, level) end
-end
-
-local function RestoreIdentity()
-    local fn = setthreadidentity or setidentity or set_thread_identity
-    if fn then pcall(fn, 2) end
-end
-
--- Load Inventory Modules
-local function LoadInventoryModules()
-    if InvModules.Ready then return true end
-
-    local paths = {
-        Inventory = "Controllers.UI.Inventory",
-        ItemConfig = "ItemConfig",
-        ItemService = "ItemReplicationService",
-        KEYS = "ItemReplicationService.KEYS"
-    }
-
-    for name, path in pairs(paths) do
-        local parts = {}
-        for part in path:gmatch("[^.]+") do
-            table.insert(parts, part)
-        end
-
-        local node = ReplicatedStorage
-        for _, part in ipairs(parts) do
-            node = node:FindFirstChild(part)
-            if not node then
-                warn("[YellowBelt] Không tìm thấy: " .. path)
-                return false
-            end
-        end
-
-        local ok, mod = pcall(function()
-            RaiseIdentity(3)
-            local result = require(node)
-            RestoreIdentity()
-            return result
-        end)
-
-        if not ok then
-            warn("[YellowBelt] Require lỗi: " .. path)
-            return false
-        end
-
-        InvModules[name] = mod
-    end
-
-    InvModules.Ready = true
-    return true
-end
-
--- Refresh Inventory
-local function RefreshInventory()
-    if not InvModules.Ready then
-        if not LoadInventoryModules() then
-            return false
-        end
-    end
-
+-- Check item có trong inventory không
+local function HasItemInInventory(itemName)
     -- Đợi initialized
-    for i = 1, 10 do
-        local ok1, res1 = pcall(function() return InvModules.Inventory:GetIfInitialized() end)
-        local ok2, res2 = pcall(function() return InvModules.ItemService.IsInitialized end)
-
-        if ok1 and res1 == true and ok2 and res2 == true then
-            break
-        end
-
-        if i == 10 then
-            warn("[YellowBelt] Inventory chưa initialized")
+    local attempts = 0
+    repeat
+        task.wait(0.2)
+        attempts = attempts + 1
+        if attempts > 50 then -- timeout 10s
+            warn("[YellowBelt] Timeout waiting for Inventory")
             return false
         end
+    until Inventory:GetIfInitialized() and ItemService.IsInitialized == true
 
-        task.wait(0.5)
+    -- Lấy amounts
+    local Amounts = {}
+    for _, item in pairs(ItemService:GetItems(KEYS.QUANTITY) or {}) do
+        Amounts[item.ItemId] = (Amounts[item.ItemId] or 0) + (tonumber(item.Value) or 0)
     end
 
-    -- Đọc inventory
-    InventoryCache = {}
+    -- Check tiles
+    local Checked = {}
+    for _, tile in pairs(Inventory:GetTiles() or {}) do
+        local id = tile.ItemId
 
-    local amounts = {}
-    local okQty, qtyList = pcall(function()
-        return InvModules.ItemService:GetItems(InvModules.KEYS.QUANTITY)
-    end)
+        if id and not Checked[id] then
+            Checked[id] = true
 
-    if okQty and type(qtyList) == "table" then
-        for _, item in pairs(qtyList) do
-            if type(item) == "table" and item.ItemId then
-                amounts[item.ItemId] = (amounts[item.ItemId] or 0) + (tonumber(item.Value) or 0)
-            end
-        end
-    end
-
-    local okTiles, tiles = pcall(function() return InvModules.Inventory:GetTiles() end)
-    if not okTiles or type(tiles) ~= "table" then
-        warn("[YellowBelt] GetTiles lỗi")
-        return false
-    end
-
-    local seen = {}
-    for _, tile in pairs(tiles) do
-        local id = type(tile) == "table" and tile.ItemId or nil
-        if id and not seen[id] then
-            seen[id] = true
-
-            local okCfg, config = pcall(function()
-                return InvModules.ItemConfig.match(id):unwrap()
+            local success, config = pcall(function()
+                return ItemConfig.match(id):unwrap()
             end)
 
-            if okCfg and type(config) == "table" and config.Display then
+            if success and config and config.Display then
                 local name = config.Display.Name
-                    or (config.Index and config.Index.StorageKey)
+                    or config.Index.StorageKey
                     or tostring(id)
 
-                InventoryCache[tostring(name)] = {
-                    Name = tostring(name),
-                    Count = amounts[id] or 1,
-                    ItemId = id
-                }
+                if name == itemName then
+                    return true -- TÌM THẤY!
+                end
             end
         end
     end
 
-    return true
+    return false -- Không tìm thấy
 end
-
--- Check item trong cache
-local function CheckItemInCache(itemName)
-    return InventoryCache[itemName] ~= nil
-end
-
--- Auto refresh khi có thay đổi
-pcall(function()
-    local ItemService = ReplicatedStorage:FindFirstChild("ItemReplicationService")
-    if ItemService then
-        local ItemAdded = ItemService:FindFirstChild("ItemAdded")
-        local ItemRemoved = ItemService:FindFirstChild("ItemRemoved")
-
-        if ItemAdded then
-            ItemAdded.Event:Connect(function()
-                task.delay(0.5, RefreshInventory)
-            end)
-        end
-
-        if ItemRemoved then
-            ItemRemoved.Event:Connect(function()
-                task.delay(0.5, RefreshInventory)
-            end)
-        end
-    end
-end)
 
 -- ══════════════════════════════════════════════════════════════════════════
 
@@ -236,10 +120,7 @@ local function MarkFound(source)
     return true
 end
 
--- ══ CHECK LOGIC MỚI ══
-local CheckAttempts = 0
-local MaxRefreshAttempts = 3
-
+-- ══ CHECK LOGIC ĐƠN GIẢN ══
 local function CheckYellowBelt()
     -- CHECK 1: Character
     local chr = Player.Character
@@ -253,31 +134,13 @@ local function CheckYellowBelt()
         return MarkFound("Backpack")
     end
 
-    -- CHECK 3: Inventory mới (ItemReplicationService)
-    StatusLabel.Text = "🔍 Đang quét Inventory... (" .. (CheckAttempts + 1) .. ")"
+    -- CHECK 3: Inventory
+    StatusLabel.Text = "🔍 Đang quét Inventory..."
     StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 
-    CheckAttempts = CheckAttempts + 1
-
-    -- Chỉ refresh tối đa 3 lần mỗi vòng check
-    if CheckAttempts <= MaxRefreshAttempts then
-        local ok = RefreshInventory()
-
-        if not ok then
-            StatusLabel.Text = "⚠️ Đang load Inventory... (" .. CheckAttempts .. "/" .. MaxRefreshAttempts .. ")"
-            StatusLabel.TextColor3 = Color3.fromRGB(255, 160, 0)
-            return false
-        end
-    end
-
-    -- Check cache
-    if CheckItemInCache("Dojo Belt (Yellow)") then
+    if HasItemInInventory("Dojo Belt (Yellow)") then
         return MarkFound("Inventory")
-    end
-
-    -- Reset counter sau khi check xong
-    if CheckAttempts >= MaxRefreshAttempts then
-        CheckAttempts = 0
+    else
         StatusLabel.Text = "❌ CHƯA CÓ YELLOW BELT"
         StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
     end
@@ -287,9 +150,6 @@ end
 
 -- ══ MAIN LOOP ══
 warn("[YellowBelt] Game đã load — Bắt đầu check mỗi 15s.")
-
--- Đợi thêm 5s để inventory system load
-task.wait(5)
 
 while true do
     local ok, success = pcall(CheckYellowBelt)
