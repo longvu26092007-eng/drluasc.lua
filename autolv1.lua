@@ -558,7 +558,7 @@ task.spawn(function()
                         ["Select Skills Gun"] = {},
                         ["Select Skills Blox Fruit"] = {}
                     }
-                    loadstring(game:HttpGet("https://raw.githubusercontent.com/obiiyeuem/vthangsitink/main/BananaCat-KaitunLevi.lua"))()
+                    loadstring(game:HttpGet("https://banana-hub.xyz/scripts/kaitun_levi.lua"))()
                 end)
 
                 -- ========================================
@@ -646,7 +646,7 @@ task.spawn(function()
 
                 task.spawn(function()
                     getgenv().Key = NhapKey
-                    loadstring(game:HttpGet("https://raw.githubusercontent.com/obiiyeuem/vthangsitink/main/BananaCat-KaitunLevi.lua"))()
+                    loadstring(game:HttpGet("https://banana-hub.xyz/scripts/kaitun_levi.lua"))()
                 end)
             end
 
