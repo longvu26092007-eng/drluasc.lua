@@ -12,7 +12,99 @@ repeat task.wait() until game.Players.LocalPlayer.Character
 local Player = game.Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local CommF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- INVENTORY SYSTEM - COPY Y HỆT changetrade.lua ĐÚNG
+-- ══════════════════════════════════════════════════════════════════════════
+
+-- Thread identity functions
+local _setidentity = setthreadidentity or setidentity or set_thread_identity
+local _getidentity = getthreadidentity or getidentity or get_thread_identity
+
+local function RaiseIdentity()
+    if not _setidentity then return nil end
+    local prev
+    if _getidentity then
+        local ok, v = pcall(_getidentity)
+        if ok then prev = v end
+    end
+    pcall(_setidentity, 8)
+    return prev
+end
+
+local function RestoreIdentity(prev)
+    if not _setidentity then return end
+    pcall(_setidentity, prev or 8)
+end
+
+-- Require modules trực tiếp
+local Inventory = require(ReplicatedStorage.Controllers.UI.Inventory)
+local ItemConfig = require(ReplicatedStorage.ItemConfig)
+local ItemService = require(ReplicatedStorage.ItemReplicationService)
+local KEYS = require(ReplicatedStorage.ItemReplicationService.KEYS)
+
+-- Check initialized
+local function inventoryInitialized()
+    local ok, ready = pcall(function()
+        return Inventory:GetIfInitialized()
+    end)
+    return ok and ready and ItemService.IsInitialized == true
+end
+
+-- Check item có trong inventory không
+local function HasItemInInventory(itemName)
+    -- Đợi initialized (timeout 30s)
+    local deadline = os.clock() + 30
+    repeat
+        task.wait(0.2)
+    until inventoryInitialized() or os.clock() >= deadline
+
+    if not inventoryInitialized() then
+        warn("[YellowBelt] Timeout waiting for Inventory (30s)")
+        return false
+    end
+
+    -- WRAP đọc inventory bằng RaiseIdentity
+    local prev = RaiseIdentity()
+
+    local found = false
+    pcall(function()
+        -- Lấy amounts
+        local Amounts = {}
+        for _, item in pairs(ItemService:GetItems(KEYS.QUANTITY) or {}) do
+            Amounts[item.ItemId] = (Amounts[item.ItemId] or 0) + (tonumber(item.Value) or 0)
+        end
+
+        -- Check tiles
+        local Checked = {}
+        for _, tile in pairs(Inventory:GetTiles() or {}) do
+            local id = tile.ItemId
+
+            if id and not Checked[id] then
+                Checked[id] = true
+
+                local success, config = pcall(function()
+                    return ItemConfig.match(id):unwrap()
+                end)
+
+                if success and config and config.Display then
+                    local name = config.Display.Name
+                        or config.Index.StorageKey
+                        or tostring(id)
+
+                    if name == itemName then
+                        found = true
+                    end
+                end
+            end
+        end
+    end)
+
+    RestoreIdentity(prev)
+    return found
+end
+
+-- ══════════════════════════════════════════════════════════════════════════
 
 -- ══ TẠO UI SAU KHI GAME ĐÃ LOAD ══
 local function CreateMiniUI()
@@ -64,32 +156,6 @@ local function MarkFound(source)
     return true
 end
 
--- ══ INVOKE VỚI TIMEOUT ══
-local function InvokeWithTimeout(remote, timeout, ...)
-    local result, done = nil, false
-    local args = {...}
-
-    task.spawn(function()
-        local ok, res = pcall(function()
-            return remote:InvokeServer(table.unpack(args))
-        end)
-        if ok then result = res end
-        done = true
-    end)
-
-    local elapsed = 0
-    while not done and elapsed < timeout do
-        task.wait(0.1)
-        elapsed = elapsed + 0.1
-    end
-
-    if not done then
-        warn("[YellowBelt] InvokeServer timeout sau " .. timeout .. "s")
-    end
-
-    return result
-end
-
 -- ══ CHECK LOGIC ══
 local function CheckYellowBelt()
     -- CHECK 1: Character
@@ -104,24 +170,15 @@ local function CheckYellowBelt()
         return MarkFound("Backpack")
     end
 
-    -- CHECK 3: Inventory timeout 8s
+    -- CHECK 3: Inventory (NEW SYSTEM)
     StatusLabel.Text = "🔍 Đang quét Inventory..."
     StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 
-    local inv = InvokeWithTimeout(CommF, 8, "getInventory")
-
-    if type(inv) == "table" then
-        for _, item in pairs(inv) do
-            if type(item) == "table" and item.Name == "Dojo Belt (Orange)" then
-                return MarkFound("Inventory")
-            end
-        end
+    if HasItemInInventory("Dojo Belt (Orange)") then
+        return MarkFound("Inventory")
+    else
         StatusLabel.Text = "❌ CHƯA CÓ YELLOW BELT"
         StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    else
-        StatusLabel.Text = "⚠️ Timeout Inventory, thử lại..."
-        StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-        warn("[YellowBelt] Timeout getInventory, thử lại sau 15s")
     end
 
     return false
